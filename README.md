@@ -1,2 +1,2 @@
 # AI-PlasmaDriveCard
-AI-assisted KDE Plasma disk-space widget, inspired by the Windows 7 Drive Meter gadget.
+KDE Plasma disk-space widget, developed with AI assistance, inspired by the Windows 7 Drive Meter gadget.
