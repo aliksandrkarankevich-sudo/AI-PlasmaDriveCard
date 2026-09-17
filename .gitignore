@@ -1,0 +1,19 @@
+# Qt / QML generated files
+*.qmlc
+
+# Local backups and editor temporary files
+*.backup
+*.backup-*
+*~
+*.swp
+*.tmp
+
+# Local package and archive artifacts
+*.plasmoid
+*.tar
+*.tar.gz
+*.tar.zst
+
+# Build directories
+build/
+cmake-build-*/
