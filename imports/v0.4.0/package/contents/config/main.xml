@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+    <kcfgfile name=""/>
+    <group name="General">
+        <entry name="displayName" type="String">
+            <label>Display name</label>
+            <default>Games</default>
+        </entry>
+        <entry name="mountPath" type="String">
+            <label>Mount point</label>
+            <default>/mnt/LinuxGames</default>
+        </entry>
+        <entry name="iconName" type="String">
+            <label>Icon name</label>
+            <default>folder-games</default>
+        </entry>
+        <entry name="updateInterval" type="Int">
+            <label>Update interval in seconds</label>
+            <default>60</default>
+            <min>10</min>
+            <max>3600</max>
+        </entry>
+        <entry name="warningPercent" type="Int">
+            <label>Warning used percent</label>
+            <default>85</default>
+            <min>1</min>
+            <max>99</max>
+        </entry>
+        <entry name="criticalPercent" type="Int">
+            <label>Critical used percent</label>
+            <default>95</default>
+            <min>2</min>
+            <max>100</max>
+        </entry>
+    </group>
+</kcfg>

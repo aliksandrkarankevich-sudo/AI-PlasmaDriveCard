@@ -1,0 +1,16 @@
+{
+    "KPackageStructure": "Plasma/Applet",
+    "KPlugin": {
+        "Authors": [{"Name": "Perplexity AI"}],
+        "Category": "System Information",
+        "Description": "Desktop card with free space of one mounted filesystem",
+        "Description[ru]": "Карточка свободного места одной смонтированной файловой системы",
+        "Icon": "drive-harddisk",
+        "Id": "io.github.cachyos.drivecard",
+        "License": "GPL-3.0-or-later",
+        "Name": "Drive Card",
+        "Name[ru]": "Карточка диска",
+        "Version": "0.4.0"
+    },
+    "X-Plasma-API-Minimum-Version": "6.0"
+}
