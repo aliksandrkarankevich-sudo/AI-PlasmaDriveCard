@@ -1,0 +1,16 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Id": "io.github.cachyos.drivecard",
+    "Name": "Drive Card",
+    "Name[ru]": "Карточка дисков",
+    "Description": "Cards for mounted filesystems",
+    "Description[ru]": "Карточки смонтированных файловых систем",
+    "Icon": "drive-harddisk",
+    "Category": "System Information",
+    "Version": "0.6.2",
+    "License": "GPL-3.0-or-later",
+    "Authors": [{"Name": "Perplexity AI and SanR"}]
+  },
+  "X-Plasma-API-Minimum-Version": "6.0"
+}
