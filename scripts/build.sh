@@ -10,17 +10,12 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 import sys
 root = Path('package')
-# Exclude backup files and editor temp files
-skip_suffixes = {'.backup', '.bak', '.orig', '.swp', '.swo', '~'}
+# Exclude backup files and editor swap files
+exclude = ('.backup', '.bak', '.orig', '.swp', '.swo', '~')
 with ZipFile(sys.argv[1], 'w', ZIP_DEFLATED) as z:
     for p in sorted(root.rglob('*')):
-        if not p.is_file():
-            continue
-        if any(p.name.endswith(s) for s in skip_suffixes):
-            continue
-        if p.name.startswith('.'):
-            continue
-        z.write(p, p.relative_to(root))
+        if p.is_file() and not any(p.name.endswith(e) for e in exclude):
+            z.write(p, p.relative_to(root))
 PY
 (cd dist && sha256sum "$(basename "$out")" > SHA256SUMS)
-echo "Built $out"
+echo "Создан $out"
