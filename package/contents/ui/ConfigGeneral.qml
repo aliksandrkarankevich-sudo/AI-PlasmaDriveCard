@@ -10,33 +10,33 @@ QQC2.ScrollView {
     QQC2.ScrollBar.vertical.policy: QQC2.ScrollBar.AsNeeded
 
     property string cfg_language
-    property bool cfg_autoFit
-    property int cfg_rowHeight
-    property int cfg_textScale
-    property int cfg_progressHeight
-    property int cfg_maxHeight
-    property bool cfg_showRoot
-    property bool cfg_showBoot
-    property bool cfg_showFs
-    property bool cfg_showPhysical
+    property bool   cfg_autoFit
+    property int    cfg_rowHeight
+    property int    cfg_textScale
+    property int    cfg_progressHeight
+    property int    cfg_maxHeight
+    property bool   cfg_showRoot
+    property bool   cfg_showBoot
+    property bool   cfg_showFs
+    property bool   cfg_showPhysical
     property string cfg_iconStyle
-    property bool cfg_showActivity
-    property int cfg_activityInterval
-    property int cfg_backgroundOpacity
+    property bool   cfg_showActivity
+    property int    cfg_activityInterval
+    property int    cfg_backgroundOpacity
     property string cfg_backgroundColorMode
     property string cfg_backgroundColor
-    property int cfg_textOpacity
+    property int    cfg_textOpacity
     property string cfg_textColorMode
     property string cfg_textColor
-    property bool cfg_rounded
-    property int cfg_cornerRadius
-    property int cfg_edgeOpacity
-    property int cfg_edgeWidth
-    property int cfg_edgeCurve
-    property int cfg_contentPadding
-    property int cfg_updateInterval
-    property int cfg_warningPercent
-    property int cfg_criticalPercent
+    property bool   cfg_rounded
+    property int    cfg_cornerRadius
+    property int    cfg_edgeOpacity
+    property int    cfg_edgeWidth
+    property int    cfg_edgeCurve
+    property int    cfg_contentPadding
+    property int    cfg_updateInterval
+    property int    cfg_warningPercent
+    property int    cfg_criticalPercent
 
     readonly property bool ru: cfg_language !== "en"
     function tr2(ruText, enText) { return ru ? ruText : enText }

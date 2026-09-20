@@ -1,100 +1,117 @@
 # Drive Cards
 
-A Plasma 6 widget that shows mounted local filesystems as configurable cards.
-Click any row to open the drive in your file manager.
+![Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)
+![Version](https://img.shields.io/badge/version-0.95.0--beta2-orange)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-green)
 
-## Quick Install
+Небольшой полупрозрачный виджет дисков для KDE Plasma 6 и CachyOS. Показывает смонтированные локальные разделы, свободное место, файловую систему и краткое имя физического накопителя.
 
-### Option 1 — Download ready-made file
+English: a compact configurable drive-card widget for KDE Plasma 6.
 
-1. Open the [**Releases**](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases) page.
-2. Download `cachyos-drive-card-<version>.plasmoid`.
-3. Right-click the desktop → **Add Widgets → Install Widget from Local File**.
-4. Select the downloaded file.
+## Возможности
 
-Or install via terminal:
+- Русский и английский интерфейс.
+- Автоматическая высота при изменении числа разделов.
+- Открытие раздела нажатием по всей строке.
+- Четырёхсторонний плавный переход фона в прозрачность.
+- Значки диска, папки и открытой папки.
+- Масштаб текста и толщина индикатора заполнения.
+- Цвета и прозрачность фона и текста.
+- Настраиваемые скругления и прозрачные края.
+- Индикатор операций чтения/записи.
+- Автообновление после подключения и отключения накопителя.
+
+## Установка
+
+### Способ 1 — Автоматически из GitHub Releases (рекомендуется)
+
+Скачивает последний выпуск, проверяет контрольную сумму и устанавливает:
 
 ```bash
-kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-0.95.0-beta2.plasmoid
-```
-
-Upgrade an existing installation:
-
-```bash
-kpackagetool6 --type Plasma/Applet --upgrade cachyos-drive-card-0.95.0-beta2.plasmoid
-```
-
-### Option 2 \u2014 Install latest release automatically
-
-Download, inspect, then run:
-
-```bash
-curl -LO https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh
-less install-from-github.sh
+curl -fsSL https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh -o install-from-github.sh
 bash install-from-github.sh
 ```
 
-The script fetches the latest release, verifies the SHA-256 checksum, and
-installs or upgrades the widget automatically.
+> Рекомендуется сначала просмотреть скрипт: `less install-from-github.sh`
 
-### Option 3 \u2014 Install from Git (for testing or development)
+Для установки beta-версии:
 
 ```bash
-git clone --depth 1 https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
-cd AI-PlasmaDriveCard
-bash scripts/install.sh
+bash install-from-github.sh --prerelease
 ```
 
-To install a specific version:
+### Способ 2 — Вручную из Releases
+
+1. Перейдите на страницу [Releases](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases).
+2. Скачайте файл `*.plasmoid`.
+3. Установите командой:
 
 ```bash
-git clone --branch v0.95.0-beta2 --depth 1 \
+kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
+```
+
+При обновлении замените `--install` на `--upgrade`.
+
+Либо откройте файл через Plasma: правая кнопка на рабочем столе → **Добавить виджеты** → **Установить виджет из локального файла**.
+
+### Способ 3 — Из исходников (для разработки и тестирования)
+
+```bash
+git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+cd AI-PlasmaDriveCard
+./scripts/install.sh
+```
+
+Для конкретной ветки или тега:
+
+```bash
+git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
   https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-bash scripts/install.sh
+./scripts/install.sh
 ```
 
-## Uninstall
+## Обновление
+
+Через скрипт — достаточно запустить его снова. Вручную:
 
 ```bash
-bash scripts/uninstall.sh
-# or
+kpackagetool6 --type Plasma/Applet --upgrade cachyos-drive-card-*.plasmoid
+```
+
+## Удаление
+
+```bash
+./scripts/uninstall.sh
+```
+
+Либо вручную:
+
+```bash
 kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 ```
 
-## Requirements
+## Сборка и проверка
 
-- KDE Plasma 6
-- `findmnt` and `lsblk` (included in `util-linux`)
-- `kpackagetool6` (from `plasma-framework` or `plasma6-sdk`)
+```bash
+./scripts/check.sh
+./scripts/build.sh
+```
 
-## Features
+Готовый пакет появится в `dist/`.
 
-- Shows all mounted local filesystems as cards
-- Click any row to open the drive in your file manager
-- Configurable four-sided background fade
-- Per-row read/write activity indicator
-- Filesystem type and physical drive info
-- Colour-coded progress bar (normal / warning / critical)
-- Light and dark theme support
-- Configurable icon style: drive, folder, open folder
-- Auto-fit height
-- Separate language setting (Russian / English)
+## Сообщение об ошибке
 
-## Configuration
+Используйте форму **Bug report** в [Issues](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues). Приложите версию Plasma, способ установки, шаги воспроизведения, снимок экрана и вывод:
 
-Right-click the widget and select **Configure Drive Cards**.
+```bash
+journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
+```
 
-## Reporting Issues
+## Статус
 
-Please open an issue at
-[github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues)
-and include:
+0.95.0-beta2 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
 
-- Widget version (visible in the config dialog title)
-- Plasma version: `plasmashell --version`
-- Output of: `findmnt --real --output SOURCE,TARGET,FSTYPE`
+## Лицензия
 
-## License
-
-GPL-3.0-or-later
+GPL-3.0-or-later.

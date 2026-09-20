@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Drive Cards — 0.95.0-beta2
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -10,6 +12,8 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
+    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
+
     readonly property bool ru: Plasmoid.configuration.language !== "en"
     readonly property int pad: Plasmoid.configuration.contentPadding
     readonly property int rowH: Plasmoid.configuration.rowHeight
@@ -20,13 +24,12 @@ PlasmoidItem {
     property bool watchersRunning: false
     property var previousIo: ({})
 
-    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
-
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
-        var t = target === "/" ? target : target.replace(/\/+$/, "")
+        // Normalise: ensure trailing slash so Dolphin opens the mount root
+        var t = target.replace(/\/+$/, "") + "/"
         Qt.openUrlExternally("file://" + encodeURI(t))
     }
     function displayIcon(target, physical) {
@@ -83,7 +86,7 @@ PlasmoidItem {
         var lsblkData
         try {
             findmntData = JSON.parse(output.substring(0, markerIndex).trim())
-            lsblkData = JSON.parse(output.substring(markerIndex + marker.length).trim())
+            lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
             return
@@ -109,10 +112,10 @@ PlasmoidItem {
             if (!Plasmoid.configuration.showRoot && target === "/") continue
             if (!Plasmoid.configuration.showBoot && (target === "/boot" || target === "/boot/efi")) continue
             if (seen[source]) continue
-            var size = Number(fs.size) || 0
+            var size      = Number(fs.size)  || 0
             var available = Number(fs.avail) || 0
-            var used = parseInt(String(fs["use%"] || "0")) || 0
-            var label = fs.label || ""
+            var used      = parseInt(String(fs["use%"] || "0")) || 0
+            var label     = fs.label || ""
             if (target === "/") label = tr2("Система", "System")
             else if (!label) label = basename(target)
             var physical = shortDrive(source, map)
@@ -236,13 +239,13 @@ PlasmoidItem {
     }
     Connections {
         target: Plasmoid.configuration
-        function onShowRootChanged() { root.refresh(0) }
-        function onShowBootChanged() { root.refresh(0) }
+        function onShowRootChanged()  { root.refresh(0) }
+        function onShowBootChanged()  { root.refresh(0) }
         function onRowHeightChanged() { fitTimer.restart() }
         function onMaxHeightChanged() { fitTimer.restart() }
-        function onAutoFitChanged() { fitTimer.restart() }
+        function onAutoFitChanged()   { fitTimer.restart() }
     }
-    Component.onCompleted: { refresh(0); startWatchers() }
+    Component.onCompleted:  { refresh(0); startWatchers() }
     Component.onDestruction: stopWatchers()
 
     fullRepresentation: Item {
@@ -261,87 +264,52 @@ PlasmoidItem {
             ? Plasmoid.configuration.textColor : Kirigami.Theme.textColor
         readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
-        readonly property real baseAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
-        // edgeAlpha target at the very edge (edgeOpacity=100 → fully transparent)
-        readonly property real edgeAlpha: baseAlpha * (1.0 - Plasmoid.configuration.edgeOpacity / 100.0)
-        // delta applied by gradient masks: negative drives edge toward transparent
-        readonly property real edgeDelta: view.edgeAlpha - view.baseAlpha
-        readonly property real curve: Plasmoid.configuration.edgeCurve / 100.0
-        // fraction of widget used for fade on each side; 0 disables gradients
-        readonly property real edgeFraction: Plasmoid.configuration.edgeWidth <= 0 ? 0.0
-            : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1, Math.min(width, height)))
+        readonly property real  centerAlpha:   Plasmoid.configuration.backgroundOpacity / 100.0
+        // edgeAlpha: user sets how transparent the edge is (0 = fully transparent edge)
+        readonly property real  edgeAlpha:     centerAlpha * (1.0 - Plasmoid.configuration.edgeOpacity / 100.0)
+        readonly property real  fadeCurve:     Plasmoid.configuration.edgeCurve / 100.0
+        readonly property real  fadeFraction:  Plasmoid.configuration.edgeWidth <= 0 ? 0.0
+            : Math.min(0.45, Plasmoid.configuration.edgeWidth /
+                             Math.max(1, Math.min(view.width, view.height)))
+        readonly property real  cornerR: Plasmoid.configuration.rounded
+            ? Plasmoid.configuration.cornerRadius : 0
 
-        // Base: single solid rect at center opacity — no double-layering
-        Rectangle {
+        // ── Four-sided transparent edge fade ──────────────────────
+        EdgeFadeBackground {
             anchors.fill: parent
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                           view.backgroundBase.b, view.baseAlpha)
+            baseColor:   view.backgroundBase
+            centerAlpha: view.centerAlpha
+            edgeAlpha:   view.edgeAlpha
+            fadeFraction: view.fadeFraction
+            curve:       view.fadeCurve
+            radius:      view.cornerR
         }
 
-        // Horizontal fade mask (left + right)
-        Rectangle {
-            anchors.fill: parent
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            visible: view.edgeFraction > 0 && view.edgeDelta < 0
-            color: "transparent"
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                property real inner: Math.max(0.001, Math.min(0.499,
-                    view.edgeFraction * (1.0 + view.curve)))
-                GradientStop { position: 0.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, view.edgeDelta) }
-                GradientStop { position: parent.inner
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0) }
-                GradientStop { position: 1.0 - parent.inner
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0) }
-                GradientStop { position: 1.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, view.edgeDelta) }
-            }
-        }
-
-        // Vertical fade mask (top + bottom)
-        Rectangle {
-            anchors.fill: parent
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            visible: view.edgeFraction > 0 && view.edgeDelta < 0
-            color: "transparent"
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                property real inner: Math.max(0.001, Math.min(0.499,
-                    view.edgeFraction * (1.0 + view.curve)))
-                GradientStop { position: 0.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, view.edgeDelta) }
-                GradientStop { position: parent.inner
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0) }
-                GradientStop { position: 1.0 - parent.inner
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0) }
-                GradientStop { position: 1.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, view.edgeDelta) }
-            }
-        }
-
+        // ── Content ───────────────────────────────────────────────
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: root.pad
             spacing: 4
 
+            // Header row
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
                 Kirigami.Icon { source: "drive-harddisk"; Layout.preferredWidth: 22; Layout.preferredHeight: 22 }
-                PC3.Label { text: root.tr2("Диски", "Drives"); color: view.labelColor; font.bold: true; font.pixelSize: root.fontPx(20); Layout.fillWidth: true }
-                PC3.Label { text: drives.count; color: view.labelColor; opacity: 0.72; font.pixelSize: root.fontPx(13) }
+                PC3.Label {
+                    text: root.tr2("Диски", "Drives")
+                    color: view.labelColor; font.bold: true
+                    font.pixelSize: root.fontPx(20)
+                    Layout.fillWidth: true
+                }
+                PC3.Label {
+                    text: drives.count
+                    color: view.labelColor; opacity: 0.72
+                    font.pixelSize: root.fontPx(13)
+                }
             }
 
+            // Drive list
             ListView {
                 id: list
                 Layout.fillWidth: true
@@ -350,10 +318,13 @@ PlasmoidItem {
                 model: drives
                 boundsBehavior: Flickable.StopAtBounds
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
-                    policy: list.contentHeight > list.height ? QQC2.ScrollBar.AsNeeded : QQC2.ScrollBar.AlwaysOff
+                    policy: list.contentHeight > list.height
+                        ? QQC2.ScrollBar.AsNeeded
+                        : QQC2.ScrollBar.AlwaysOff
                 }
 
                 delegate: QQC2.ItemDelegate {
+                    // ── Required model roles ───────────────────────
                     required property string title
                     required property string target
                     required property string source
@@ -361,41 +332,37 @@ PlasmoidItem {
                     required property string physical
                     required property double total
                     required property double available
-                    required property int used
+                    required property int    used
                     required property string icon
                     required property string kname
-                    required property bool active
+                    required property bool   active
 
-                    width: list.width - (list.contentHeight > list.height ? 10 : 0)
+                    width:  list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
 
+                    // Clicking the whole row opens the drive
                     onClicked: root.openTarget(target)
 
-                    background: Rectangle {
-                        radius: Plasmoid.configuration.rounded
-                            ? Math.max(0, Plasmoid.configuration.cornerRadius - root.pad)
-                            : 0
-                        color: parent.hovered
-                            ? Qt.rgba(Kirigami.Theme.highlightColor.r,
-                                      Kirigami.Theme.highlightColor.g,
-                                      Kirigami.Theme.highlightColor.b,
-                                      parent.pressed ? 0.22 : 0.12)
-                            : "transparent"
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                    // Show pointer cursor so the user knows it's clickable
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        // Pass all events through — ItemDelegate handles them
+                        acceptedButtons: Qt.NoButton
                     }
 
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.delay: 600
-                    QQC2.ToolTip.text: source + "\n" + target + "\n"
-                        + root.tr2("Нажмите для открытия", "Click to open")
+                    QQC2.ToolTip.text:   source + "\n" + target
 
+                    // ── Row layout ────────────────────────────────
                     contentItem: RowLayout {
                         anchors.leftMargin: 4
                         anchors.rightMargin: 8
                         spacing: 14
 
+                        // Drive icon + activity dot
                         Item {
-                            Layout.preferredWidth: Math.min(64, root.rowH - 30)
+                            Layout.preferredWidth:  Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
                             Kirigami.Icon { anchors.fill: parent; source: icon }
                             Rectangle {
@@ -407,21 +374,27 @@ PlasmoidItem {
                             }
                         }
 
+                        // Text + progress
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
                             spacing: 4
+
                             PC3.Label {
-                                text: title; color: view.labelColor
-                                font.bold: true; font.pixelSize: root.fontPx(18)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                text: title
+                                color: view.labelColor; font.bold: true
+                                font.pixelSize: root.fontPx(18)
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
                                 text: root.formatBytes(available) + " "
                                     + root.tr2("свободно из", "free of") + " "
                                     + root.formatBytes(total)
-                                color: view.labelColor; font.pixelSize: root.fontPx(16)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                color: view.labelColor
+                                font.pixelSize: root.fontPx(16)
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
                                 visible: Plasmoid.configuration.showFs || Plasmoid.configuration.showPhysical
@@ -432,7 +405,8 @@ PlasmoidItem {
                                 }
                                 color: view.labelColor; opacity: 0.72
                                 font.pixelSize: root.fontPx(13)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             QQC2.ProgressBar {
                                 Layout.fillWidth: true
@@ -447,12 +421,14 @@ PlasmoidItem {
                             PC3.Label {
                                 Layout.alignment: Qt.AlignRight
                                 text: used + "% " + root.tr2("занято", "used")
-                                color: view.labelColor; font.pixelSize: root.fontPx(13)
+                                color: view.labelColor
+                                font.pixelSize: root.fontPx(13)
                             }
                         }
                     }
                 }
 
+                // Empty-state label
                 PC3.Label {
                     anchors.centerIn: parent
                     visible: drives.count === 0

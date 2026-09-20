@@ -1,88 +1,191 @@
-// EdgeFadeBackground.qml
-// Four-sided fade-to-transparent background for Drive Cards.
-// Two stacked rectangles: horizontal gradient mask + vertical gradient mask.
-// Their alpha values multiply at the corners, giving a smooth perimeter fade.
+// SPDX-License-Identifier: GPL-3.0-or-later
+// EdgeFadeBackground.qml — four-sided transparent edge fade
+// Place this item behind all content inside fullRepresentation.
+
 import QtQuick
 
 Item {
     id: root
 
-    // ---- inputs from parent -------------------------------------------------
-    required property color  baseColor      // background colour (no alpha)
-    required property real   baseAlpha      // centre opacity  0..1
-    required property real   edgeAlpha      // edge   opacity  0..1 (should be <= baseAlpha)
-    required property real   edgeFraction   // fade width as fraction of dimension 0..0.45
-    required property real   curve          // -1..+1  negative = slow-in, positive = slow-out
-    required property bool   rounded
-    required property int    cornerRadius
-    // ------------------------------------------------------------------------
+    // ── Public inputs ────────────────────────────────────────────
+    required property color  baseColor      // surface colour (no alpha)
+    required property real   centerAlpha    // 0‥1 opacity of the centre
+    required property real   edgeAlpha      // 0‥1 opacity at the edges (≤ centerAlpha)
+    required property real   fadeFraction   // 0‥0.45  fraction of width/height used for fade
+    required property real   curve          // –1‥+1  shape of the fade (0 = linear)
+    required property real   radius         // corner radius in px
 
-    anchors.fill: parent
-
-    // Helper: map normalised position p (0..1) to alpha using curve.
-    // p=0 is the edge (edgeAlpha), p=1 is the centre (baseAlpha).
-    function fadeAlpha(p) {
-        var t = curve >= 0
-            ? Math.pow(p, 1.0 + curve * 2.0)       // slow-out: lingers near edge
-            : 1.0 - Math.pow(1.0 - p, 1.0 - curve * 2.0) // slow-in : quick rise then flat
-        return edgeAlpha + t * (baseAlpha - edgeAlpha)
+    // ── Helpers ──────────────────────────────────────────────────
+    // Blend two alpha values with a gamma-like curve.
+    // t in [0,1]: 0 = edge side, 1 = centre
+    function alphaAt(t) {
+        // Ease-in (curve > 0) keeps edge transparent longer.
+        // Ease-out (curve < 0) makes the transition sharper near the edge.
+        var shaped
+        if (curve > 0) {
+            var exp = 1.0 + curve * 2.0   // 1..3
+            shaped = Math.pow(t, exp)
+        } else {
+            var expN = 1.0 - curve * 2.0  // 1..3
+            shaped = 1.0 - Math.pow(1.0 - t, expN)
+        }
+        return edgeAlpha + (centerAlpha - edgeAlpha) * shaped
     }
 
-    // ---- solid base (centre alpha) -----------------------------------------
-    Rectangle {
-        anchors.fill: parent
-        radius: root.rounded ? root.cornerRadius : 0
-        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.baseAlpha)
+    // Build an array of GradientStop positions and their alpha values
+    // for one edge.  p0 = edge position (0 or 1), p1 = centre position.
+    // Returns an array of {pos, alpha} objects.
+    function stops(p0, p1) {
+        var result = []
+        var steps = 8
+        for (var i = 0; i <= steps; ++i) {
+            var t   = i / steps          // 0 = p0 side, 1 = p1 side
+            var pos = p0 + (p1 - p0) * t
+            result.push({ pos: pos, alpha: alphaAt(t) })
+        }
+        return result
     }
 
-    // ---- horizontal mask (left + right fade) --------------------------------
-    // Covers the full height; darkens left/right edges down to edgeAlpha.
-    // When edgeWidth == 0 (edgeFraction == 0) this rectangle is invisible.
+    // ── Solid centre fill ─────────────────────────────────────────
+    // Drawn first so the mask rectangles multiply on top.
     Rectangle {
+        id: centre
         anchors.fill: parent
-        radius: root.rounded ? root.cornerRadius : 0
-        visible: root.edgeFraction > 0
+        radius: root.radius
+        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.centerAlpha)
+    }
+
+    // ── Horizontal fade mask (left + right) ───────────────────────
+    // Covers the full height; erases alpha on the left and right sides.
+    Rectangle {
+        id: hFade
+        anchors.fill: parent
+        radius: root.radius
+        visible: root.fadeFraction > 0.001
         color: "transparent"
         gradient: Gradient {
             orientation: Gradient.Horizontal
-            // left edge -> centre
-            GradientStop { position: 0.0;                  color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.0) }
-            GradientStop { position: root.edgeFraction * 0.35; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.35)) }
-            GradientStop { position: root.edgeFraction * 0.65; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.65)) }
-            GradientStop { position: root.edgeFraction * 0.85; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.85)) }
-            GradientStop { position: root.edgeFraction;        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.baseAlpha) }
-            // centre: fully transparent overlay (solid base rect below handles this)
-            GradientStop { position: root.edgeFraction + 0.001; color: "transparent" }
-            GradientStop { position: 1.0 - root.edgeFraction - 0.001; color: "transparent" }
-            // right fade (mirror)
-            GradientStop { position: 1.0 - root.edgeFraction;        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.baseAlpha) }
-            GradientStop { position: 1.0 - root.edgeFraction * 0.85; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.85)) }
-            GradientStop { position: 1.0 - root.edgeFraction * 0.65; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.65)) }
-            GradientStop { position: 1.0 - root.edgeFraction * 0.35; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.35)) }
-            GradientStop { position: 1.0;                  color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.0) }
+
+            // Left edge → centre  (stops from position 0 to fadeFraction)
+            GradientStop {
+                position: 0.0
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0))
+            }
+            GradientStop {
+                position: root.fadeFraction * 0.25
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.25))
+            }
+            GradientStop {
+                position: root.fadeFraction * 0.5
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.5))
+            }
+            GradientStop {
+                position: root.fadeFraction * 0.75
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.75))
+            }
+            GradientStop {
+                position: root.fadeFraction
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.centerAlpha)
+            }
+
+            // Centre plateau
+            GradientStop {
+                position: 1.0 - root.fadeFraction
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.centerAlpha)
+            }
+
+            // Centre → right edge
+            GradientStop {
+                position: 1.0 - root.fadeFraction * 0.75
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.75))
+            }
+            GradientStop {
+                position: 1.0 - root.fadeFraction * 0.5
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.5))
+            }
+            GradientStop {
+                position: 1.0 - root.fadeFraction * 0.25
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.25))
+            }
+            GradientStop {
+                position: 1.0
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0))
+            }
         }
     }
 
-    // ---- vertical mask (top + bottom fade) ----------------------------------
+    // ── Vertical fade mask (top + bottom) ─────────────────────────
     Rectangle {
+        id: vFade
         anchors.fill: parent
-        radius: root.rounded ? root.cornerRadius : 0
-        visible: root.edgeFraction > 0
+        radius: root.radius
+        visible: root.fadeFraction > 0.001
         color: "transparent"
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.0;                  color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.0) }
-            GradientStop { position: root.edgeFraction * 0.35; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.35)) }
-            GradientStop { position: root.edgeFraction * 0.65; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.65)) }
-            GradientStop { position: root.edgeFraction * 0.85; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.85)) }
-            GradientStop { position: root.edgeFraction;        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.baseAlpha) }
-            GradientStop { position: root.edgeFraction + 0.001; color: "transparent" }
-            GradientStop { position: 1.0 - root.edgeFraction - 0.001; color: "transparent" }
-            GradientStop { position: 1.0 - root.edgeFraction;        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.baseAlpha) }
-            GradientStop { position: 1.0 - root.edgeFraction * 0.85; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.85)) }
-            GradientStop { position: 1.0 - root.edgeFraction * 0.65; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.65)) }
-            GradientStop { position: 1.0 - root.edgeFraction * 0.35; color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root.fadeAlpha(0.35)) }
-            GradientStop { position: 1.0;                  color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0.0) }
+
+            GradientStop {
+                position: 0.0
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0))
+            }
+            GradientStop {
+                position: root.fadeFraction * 0.25
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.25))
+            }
+            GradientStop {
+                position: root.fadeFraction * 0.5
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.5))
+            }
+            GradientStop {
+                position: root.fadeFraction * 0.75
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.75))
+            }
+            GradientStop {
+                position: root.fadeFraction
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.centerAlpha)
+            }
+
+            GradientStop {
+                position: 1.0 - root.fadeFraction
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.centerAlpha)
+            }
+
+            GradientStop {
+                position: 1.0 - root.fadeFraction * 0.75
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.75))
+            }
+            GradientStop {
+                position: 1.0 - root.fadeFraction * 0.5
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.5))
+            }
+            GradientStop {
+                position: 1.0 - root.fadeFraction * 0.25
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0.25))
+            }
+            GradientStop {
+                position: 1.0
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
+                               root.alphaAt(0))
+            }
         }
     }
 }
