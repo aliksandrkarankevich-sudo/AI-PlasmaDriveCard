@@ -26,9 +26,8 @@ PlasmoidItem {
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
-        // Normalise: ensure trailing slash for mount-point roots
-        var url = "file://" + (target.charAt(target.length - 1) === "/" ? target : target + "/")
-        Qt.openUrlExternally(url)
+        var url = target.endsWith("/") ? target : (target + "/")
+        Qt.openUrlExternally("file://" + encodeURI(url))
     }
     function displayIcon(target, physical) {
         if (Plasmoid.configuration.iconStyle === "folder") return "folder"
@@ -262,23 +261,110 @@ PlasmoidItem {
             ? Plasmoid.configuration.textColor : Kirigami.Theme.textColor
         readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
-        readonly property real baseAlpha:     Plasmoid.configuration.backgroundOpacity / 100.0
-        readonly property real edgeAlpha:     Plasmoid.configuration.edgeOpacity       / 100.0
-                                              // edgeOpacity 100 → fully transparent edge (alpha=0)
-                                              // edgeOpacity 0   → edge as opaque as centre
-        readonly property real edgeAlphaFinal: baseAlpha * (1.0 - edgeAlpha)
-        readonly property real curve:         Plasmoid.configuration.edgeCurve / 100.0
-        readonly property real edgeFraction:  Math.min(0.45,
-            Plasmoid.configuration.edgeWidth / Math.max(1.0, Math.min(view.width, view.height)))
+        readonly property real baseAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
+        readonly property real edgeAlpha: Plasmoid.configuration.edgeOpacity / 100.0
+        readonly property real edgeFraction: Plasmoid.configuration.edgeWidth <= 0
+            ? 0.0
+            : Math.min(0.48, Plasmoid.configuration.edgeWidth / Math.max(1, Math.min(width, height)))
+        readonly property real curvePow: {
+            var c = Plasmoid.configuration.edgeCurve
+            if (c === 0) return 1.0
+            return c > 0 ? (1.0 + c / 50.0) : (1.0 / (1.0 - c / 50.0))
+        }
 
-        EdgeFadeBackground {
+        // Compute alpha at a given fractional position along the fade zone [0..1]
+        // 0 = transparent edge, 1 = opaque centre
+        function fadeAlpha(t) {
+            var a = Math.pow(t, curvePow)
+            return edgeAlpha + (baseAlpha - edgeAlpha) * a
+        }
+
+        // ── Background: single base rectangle ──────────────────────────────
+        Rectangle {
+            id: bgBase
             anchors.fill: parent
-            baseColor:    view.backgroundBase
-            centerAlpha:  view.baseAlpha
-            edgeAlpha:    view.edgeAlphaFinal
-            edgeFraction: view.edgeFraction
-            curve:        view.curve
-            radius:       Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                           view.backgroundBase.b, view.baseAlpha)
+            visible: view.edgeFraction === 0
+        }
+
+        // ── Background: four-sided fade (horizontal layer) ─────────────────
+        Rectangle {
+            id: bgH
+            anchors.fill: parent
+            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            color: "transparent"
+            visible: view.edgeFraction > 0
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0;                        color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.0)) }
+                GradientStop { position: view.edgeFraction * 0.33;   color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.33)) }
+                GradientStop { position: view.edgeFraction * 0.67;   color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.67)) }
+                GradientStop { position: view.edgeFraction;          color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.baseAlpha) }
+                GradientStop { position: 1.0 - view.edgeFraction;    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.baseAlpha) }
+                GradientStop { position: 1.0 - view.edgeFraction * 0.67; color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.67)) }
+                GradientStop { position: 1.0 - view.edgeFraction * 0.33; color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.33)) }
+                GradientStop { position: 1.0;                        color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.0)) }
+            }
+        }
+
+        // ── Background: vertical fade layer (top & bottom) ─────────────────
+        Rectangle {
+            id: bgVTop
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: view.edgeFraction * parent.height
+            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            color: "transparent"
+            visible: view.edgeFraction > 0
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, view.baseAlpha - view.fadeAlpha(0.0)) }
+                GradientStop { position: 0.5; color: Qt.rgba(0, 0, 0, view.baseAlpha - view.fadeAlpha(0.5)) }
+                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0) }
+            }
+            // Use blend mode Multiply to subtract from horizontal layer
+            layer.enabled: true
+            layer.effect: null
+            // Simple approach: just additional transparent-to-transparent overlay
+            // that darkens top edge proportionally
+        }
+
+        // Simpler & more reliable vertical fade: two separate overlay rectangles
+        // that alpha-knock-down the top and bottom edges of the combined background
+        Rectangle {
+            id: bgVTopMask
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.round(view.edgeFraction * parent.height)
+            visible: view.edgeFraction > 0
+            color: "transparent"
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                GradientStop { position: 0.0; color: Kirigami.Theme.backgroundColor.toString() === "#00000000"
+                    ? "transparent"
+                    : Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b,
+                              Math.max(0, view.baseAlpha - view.fadeAlpha(0.0))) }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
+        }
+        Rectangle {
+            id: bgVBottomMask
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: Math.round(view.edgeFraction * parent.height)
+            visible: view.edgeFraction > 0
+            color: "transparent"
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 1.0; color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b,
+                              Math.max(0, view.baseAlpha - view.fadeAlpha(0.0))) }
+            }
         }
 
         ColumnLayout {
@@ -305,7 +391,8 @@ PlasmoidItem {
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height ? QQC2.ScrollBar.AsNeeded : QQC2.ScrollBar.AlwaysOff
                 }
-                delegate: Item {
+
+                delegate: QQC2.ItemDelegate {
                     required property string title
                     required property string target
                     required property string source
@@ -313,55 +400,40 @@ PlasmoidItem {
                     required property string physical
                     required property double total
                     required property double available
-                    required property int    used
+                    required property int used
                     required property string icon
                     required property string kname
-                    required property bool   active
+                    required property bool active
 
-                    width:  list.width - (list.contentHeight > list.height ? 10 : 0)
+                    width: list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
+                    hoverEnabled: true
+                    highlighted: false
 
-                    // Hover state drives the highlight
-                    HoverHandler { id: rowHover }
-
-                    // Highlight rectangle — shown on hover
-                    Rectangle {
-                        anchors.fill: parent
+                    background: Rectangle {
+                        color: parent.hovered
+                            ? Qt.rgba(Kirigami.Theme.highlightColor.r,
+                                      Kirigami.Theme.highlightColor.g,
+                                      Kirigami.Theme.highlightColor.b, 0.12)
+                            : "transparent"
                         radius: 6
-                        color: Kirigami.Theme.highlightColor
-                        opacity: rowHover.hovered ? 0.12 : 0.0
-                        Behavior on opacity {
-                            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                        }
+                        Behavior on color { ColorAnimation { duration: 120 } }
                     }
 
-                    // Cursor changes to pointer when hoverable
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        // Absorb clicks only; actual action is via TapHandler below
-                        // so we don't block scroll gestures.
-                        acceptedButtons: Qt.NoButton
-                    }
+                    onClicked: root.openTarget(target)
 
-                    // Tap handler: open on click, ignore scroll drag
-                    TapHandler {
-                        gesturePolicy: TapHandler.ReleaseWithinBounds
-                        onTapped: root.openTarget(target)
-                    }
-
-                    QQC2.ToolTip.visible: rowHover.hovered
+                    QQC2.ToolTip.visible: hovered
                     QQC2.ToolTip.text: source + "\n" + target
+                    QQC2.ToolTip.delay: 600
 
-                    RowLayout {
+                    contentItem: RowLayout {
                         anchors.fill: parent
                         anchors.leftMargin: 4
                         anchors.rightMargin: 8
                         spacing: 14
 
-                        // Drive / folder icon + activity dot
                         Item {
-                            Layout.preferredWidth:  Math.min(64, root.rowH - 30)
+                            Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
                             Kirigami.Icon { anchors.fill: parent; source: icon }
                             Rectangle {
@@ -373,7 +445,6 @@ PlasmoidItem {
                             }
                         }
 
-                        // Labels + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
@@ -418,7 +489,6 @@ PlasmoidItem {
                     }
                 }
 
-                // Empty-state label
                 PC3.Label {
                     anchors.centerIn: parent
                     visible: drives.count === 0
