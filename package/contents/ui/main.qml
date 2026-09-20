@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: GPL-3.0-or-later
-// Drive Cards — 0.95.0-beta2
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -12,6 +10,8 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
+    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
+
     readonly property bool ru: Plasmoid.configuration.language !== "en"
     readonly property int pad: Plasmoid.configuration.contentPadding
     readonly property int rowH: Plasmoid.configuration.rowHeight
@@ -22,14 +22,13 @@ PlasmoidItem {
     property bool watchersRunning: false
     property var previousIo: ({})
 
-    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
-
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
+        // Ensure trailing slash so Dolphin opens the mount point correctly
         var url = target.endsWith("/") ? target : target + "/"
-        Qt.openUrlExternally("file://" + url)
+        Qt.openUrlExternally("file://" + encodeURI(url))
     }
     function displayIcon(target, physical) {
         if (Plasmoid.configuration.iconStyle === "folder") return "folder"
@@ -51,7 +50,7 @@ PlasmoidItem {
     }
     function formatBytes(number) {
         var n = Number(number) || 0
-        var units = ru ? ["Б", "КиБ", "МиБ", "ГиБ", "ТиБ"] : ["B", "KiB", "MiB", "GiB", "TiB"]
+        var units = ru ? ["\u0411", "\u041a\u0438\u0411", "\u041c\u0438\u0411", "\u0413\u0438\u0411", "\u0422\u0438\u0411"] : ["B", "KiB", "MiB", "GiB", "TiB"]
         var i = 0
         while (n >= 1024 && i < units.length - 1) { n /= 1024; ++i }
         return Qt.locale(ru ? "ru_RU" : "en_US").toString(n, "f", i < 3 ? 0 : 1) + " " + units[i]
@@ -69,7 +68,7 @@ PlasmoidItem {
         if (match) return "NVMe " + match[1]
         if (tran === "usb") return "USB " + name
         if (tran === "sata" || /^sd[a-z]+$/.test(name)) return "SATA " + name
-        return tran ? tran.toUpperCase() + " " + name : tr2("Диск ", "Disk ") + name
+        return tran ? tran.toUpperCase() + " " + name : tr2("\u0414\u0438\u0441\u043a ", "Disk ") + name
     }
     function flatten(items, output) {
         for (var i = 0; i < (items || []).length; ++i) {
@@ -85,7 +84,7 @@ PlasmoidItem {
         var lsblkData
         try {
             findmntData = JSON.parse(output.substring(0, markerIndex).trim())
-            lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
+            lsblkData = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
             return
@@ -115,7 +114,7 @@ PlasmoidItem {
             var available = Number(fs.avail) || 0
             var used = parseInt(String(fs["use%"] || "0")) || 0
             var label = fs.label || ""
-            if (target === "/") label = tr2("Система", "System")
+            if (target === "/") label = tr2("\u0421\u0438\u0441\u0442\u0435\u043c\u0430", "System")
             else if (!label) label = basename(target)
             var physical = shortDrive(source, map)
             rows.push({
@@ -264,24 +263,22 @@ PlasmoidItem {
         readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
         readonly property real baseAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
-        readonly property real edgeAlpha: Plasmoid.configuration.edgeOpacity === 100
-            ? 0.0
-            : baseAlpha * (Plasmoid.configuration.edgeOpacity / 100.0)
-        readonly property real bandFraction: Plasmoid.configuration.edgeWidth <= 0
-            ? 0.0
-            : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1.0, Math.min(width, height)))
-        // edgeCurve is stored as -100..100 in config; normalise to -1..1 for EdgeFadeBackground
-        readonly property real curveSigned: Plasmoid.configuration.edgeCurve / 100.0
+        // edgeAlpha: opacity at the very edge (0 = fully transparent edge)
+        readonly property real edgeAlpha: baseAlpha * (1.0 - Plasmoid.configuration.edgeOpacity / 100.0)
+        readonly property real curve: Plasmoid.configuration.edgeCurve / 100.0
+        // Use shortest side so the fraction looks the same on wide and tall widgets
+        readonly property real edgeFraction: Plasmoid.configuration.edgeWidth <= 0 ? 0.0
+            : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1, Math.min(width, height)))
 
         // Four-sided fade background
         EdgeFadeBackground {
-            anchors.fill: parent
             baseColor:    view.backgroundBase
-            centerAlpha:  view.baseAlpha
+            baseAlpha:    view.baseAlpha
             edgeAlpha:    view.edgeAlpha
-            fraction:     view.bandFraction
-            curve:        view.curveSigned
-            radius:       Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            edgeFraction: view.edgeFraction
+            curve:        view.curve
+            rounded:      Plasmoid.configuration.rounded
+            cornerRadius: Plasmoid.configuration.cornerRadius
         }
 
         ColumnLayout {
@@ -294,7 +291,7 @@ PlasmoidItem {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
                 Kirigami.Icon { source: "drive-harddisk"; Layout.preferredWidth: 22; Layout.preferredHeight: 22 }
-                PC3.Label { text: root.tr2("Диски", "Drives"); color: view.labelColor; font.bold: true; font.pixelSize: root.fontPx(20); Layout.fillWidth: true }
+                PC3.Label { text: root.tr2("\u0414\u0438\u0441\u043a\u0438", "Drives"); color: view.labelColor; font.bold: true; font.pixelSize: root.fontPx(20); Layout.fillWidth: true }
                 PC3.Label { text: drives.count; color: view.labelColor; opacity: 0.72; font.pixelSize: root.fontPx(13) }
             }
 
@@ -317,38 +314,25 @@ PlasmoidItem {
                     required property string physical
                     required property double total
                     required property double available
-                    required property int    used
+                    required property int used
                     required property string icon
                     required property string kname
-                    required property bool   active
+                    required property bool active
 
                     width: list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
-
+                    // Open the drive on click, Enter or Space
                     onClicked: root.openTarget(target)
-
-                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-
+                    // Tooltip shows device node and mount point
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: source + "\n" + target + "\n" + root.tr2("Нажмите, чтобы открыть", "Click to open")
-                    QQC2.ToolTip.delay: 600
-
-                    background: Rectangle {
-                        color: "transparent"
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 6
-                            color: Kirigami.Theme.highlightColor
-                            opacity: parent.parent.hovered ? 0.10 : 0.0
-                            Behavior on opacity { NumberAnimation { duration: 120 } }
-                        }
-                    }
+                    QQC2.ToolTip.text: source + "\n" + target
 
                     contentItem: RowLayout {
                         anchors.leftMargin: 4
-                        anchors.rightMargin: 4
+                        anchors.rightMargin: 8
                         spacing: 14
 
+                        // Drive icon + activity dot
                         Item {
                             Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
@@ -362,31 +346,38 @@ PlasmoidItem {
                             }
                         }
 
+                        // Labels + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
                             spacing: 4
                             PC3.Label {
                                 text: title
-                                color: view.labelColor; font.bold: true
+                                color: view.labelColor
+                                font.bold: true
                                 font.pixelSize: root.fontPx(18)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
-                                text: root.formatBytes(available) + " " + root.tr2("свободно из", "free of") + " " + root.formatBytes(total)
-                                color: view.labelColor; font.pixelSize: root.fontPx(16)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                text: root.formatBytes(available) + " " + root.tr2("\u0441\u0432\u043e\u0431\u043e\u0434\u043d\u043e \u0438\u0437", "free of") + " " + root.formatBytes(total)
+                                color: view.labelColor
+                                font.pixelSize: root.fontPx(16)
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
                                 visible: Plasmoid.configuration.showFs || Plasmoid.configuration.showPhysical
                                 text: {
                                     var a = Plasmoid.configuration.showFs ? fs : ""
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
-                                    return a && b ? a + "  •  " + b : a + b
+                                    return a && b ? a + "  \u2022  " + b : a + b
                                 }
-                                color: view.labelColor; opacity: 0.72
+                                color: view.labelColor
+                                opacity: 0.72
                                 font.pixelSize: root.fontPx(13)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             QQC2.ProgressBar {
                                 Layout.fillWidth: true
@@ -400,8 +391,9 @@ PlasmoidItem {
                             }
                             PC3.Label {
                                 Layout.alignment: Qt.AlignRight
-                                text: used + "% " + root.tr2("занято", "used")
-                                color: view.labelColor; font.pixelSize: root.fontPx(13)
+                                text: used + "% " + root.tr2("\u0437\u0430\u043d\u044f\u0442\u043e", "used")
+                                color: view.labelColor
+                                font.pixelSize: root.fontPx(13)
                             }
                         }
                     }
@@ -411,8 +403,8 @@ PlasmoidItem {
                     anchors.centerIn: parent
                     visible: drives.count === 0
                     text: root.scanRunning
-                        ? root.tr2("Обновление…", "Refreshing…")
-                        : root.tr2("Доступные диски не найдены", "No accessible drives found")
+                        ? root.tr2("\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435\u2026", "Refreshing\u2026")
+                        : root.tr2("\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u0434\u0438\u0441\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b", "No accessible drives found")
                     color: view.labelColor
                     opacity: 0.75
                     font.pixelSize: root.fontPx(15)
