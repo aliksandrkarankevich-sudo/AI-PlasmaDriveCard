@@ -1,65 +1,108 @@
-# Drive Cards — виджет Plasma 6
+# Drive Cards
 
-Настраиваемые карточки смонтированных разделов для рабочего стола KDE Plasma 6.
-Отображает свободное место, файловую систему, физический диск и активность ввода-вывода.
-Нажатие на строку диска открывает его в файловом менеджере.
+![Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)
+![Version](https://img.shields.io/badge/version-0.95.0--beta2-orange)
+![License](https://img.shields.io/badge/license-GPL--3.0--or--later-green)
 
-![Drive Cards](https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/preview.png)
+Небольшой полупрозрачный виджет дисков для KDE Plasma 6 и CachyOS. Показывает смонтированные локальные разделы, свободное место, файловую систему и краткое имя физического накопителя.
+
+English: a compact configurable drive-card widget for KDE Plasma 6.
+
+## Возможности
+
+- Русский и английский интерфейс.
+- Автоматическая высота при изменении числа разделов.
+- Открытие раздела нажатием по любому месту строки.
+- Значки диска, папки и открытой папки.
+- Масштаб текста и толщина индикатора заполнения.
+- Цвета и прозрачность фона и текста.
+- Четырёхсторонний переход фона в прозрачность с настраиваемой шириной и кривой.
+- Настраиваемые скругления углов.
+- Индикатор операций чтения/записи.
+- Автообновление после подключения и отключения накопителя.
+
+## Установка — способы
+
+### 1. Скачать готовый файл из Releases (рекомендуется)
+
+Перейдите на страницу [Releases](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases), скачайте файл `cachyos-drive-card-*.plasmoid` и выполните:
+
+```bash
+kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-0.95.0-beta2.plasmoid
+```
+
+Для обновления существующей установки:
+
+```bash
+kpackagetool6 --type Plasma/Applet --upgrade cachyos-drive-card-0.95.0-beta2.plasmoid
+```
+
+Либо откройте режим редактирования рабочего стола Plasma → **Добавить виджеты** → **Установить из локального файла** и укажите скачанный `.plasmoid`.
 
 ---
 
-## Быстрая установка
+### 2. Установить последнюю версию одной командой
 
-### Вариант 1 — Скачать готовый файл
-
-1. Перейдите на страницу [Releases](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases).
-2. Скачайте файл `cachyos-drive-card-*.plasmoid`.
-3. Откройте режим редактирования рабочего стола Plasma.
-4. Нажмите **«Добавить виджеты»** → **«Установить виджет из файла»**.
-5. Укажите скачанный `.plasmoid`.
-
-Или через терминал:
+Просмотрите сценарий перед запуском:
 
 ```bash
-kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
+curl -LO https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh
+less install-from-github.sh
+bash install-from-github.sh
 ```
 
-### Вариант 2 — Автоматическая установка из GitHub
-
-Скачивает и устанавливает последний релиз автоматически:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh -o install-drive-cards.sh
-bash install-drive-cards.sh
-```
-
-> Рекомендуется просмотреть скрипт перед запуском: `less install-drive-cards.sh`
-
-### Вариант 3 — Установка через Git (для разработчиков и тестировщиков)
-
-```bash
-git clone --depth 1 https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
-cd AI-PlasmaDriveCard
-bash scripts/install.sh
-```
+Сценарий автоматически:
+- находит последний Release,
+- скачивает `.plasmoid` и `SHA256SUMS`,
+- проверяет контрольную сумму,
+- устанавливает или обновляет виджет.
 
 Для установки конкретной версии:
 
 ```bash
-git clone --branch v0.95.0-beta2 --depth 1 https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
-cd AI-PlasmaDriveCard
-bash scripts/install.sh
+bash install-from-github.sh --version v0.95.0-beta2
 ```
 
 ---
 
-## Обновление
+### 3. Установить из Git (для разработчиков и тестировщиков)
+
+Последняя стабильная версия:
 
 ```bash
-kpackagetool6 --type Plasma/Applet --upgrade cachyos-drive-card-*.plasmoid
+git clone --depth 1 https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+cd AI-PlasmaDriveCard
+./scripts/install.sh
 ```
 
+Конкретная версия по тегу:
+
+```bash
+git clone --branch v0.95.0-beta2 --depth 1 \
+  https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+cd AI-PlasmaDriveCard
+./scripts/install.sh
+```
+
+Тестовая ветка:
+
+```bash
+git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
+  https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+cd AI-PlasmaDriveCard
+./scripts/check.sh
+./scripts/install.sh
+```
+
+---
+
 ## Удаление
+
+```bash
+bash scripts/uninstall.sh
+```
+
+Или вручную:
 
 ```bash
 kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
@@ -67,45 +110,36 @@ kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 
 ---
 
-## Требования
-
-- KDE Plasma 6.0+
-- `findmnt`, `lsblk` (входят в состав `util-linux`)
-- `udevadm` (входит в состав `udev` / `systemd`)
-
----
-
-## Возможности
-
-- Отображение смонтированных разделов с именем, свободным местом и процентом заполнения
-- Цветовая индикация полосы заполнения: обычный / предупреждение / критический уровень
-- Индикатор активности ввода-вывода для каждого диска
-- Настраиваемый полупрозрачный фон с плавным переходом по всем четырём сторонам
-- Открытие раздела в файловом менеджере нажатием на строку
-- Варианты значка: диск, папка, открытая папка
-- Поддержка светлой и тёмной темы, пользовательские цвета
-- Автоопределение USB, NVMe, SATA
-- Автоматическое обновление при монтировании и размонтировании
-- Языки: русский, английский
-
----
-
-## Настройка
-
-Правой кнопкой мыши на виджете → **«Настроить Drive Cards»**.
-
----
-
-## Сборка `.plasmoid` вручную
+## Сборка и проверка
 
 ```bash
-bash scripts/build.sh
+./scripts/check.sh   # проверка структуры и сборка
+./scripts/build.sh   # только сборка
 ```
 
-Файл появится в `dist/`.
+Готовый пакет появится в `dist/`.
 
 ---
+
+## Сообщение об ошибке
+
+Используйте форму **Bug report** в [Issues](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues). Приложите:
+- версию Plasma и дистрибутив;
+- способ установки и версию виджета;
+- шаги воспроизведения;
+- снимок экрана;
+- вывод журнала:
+
+```bash
+journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
+```
+
+---
+
+## Статус
+
+0.95.0-beta2 — тестовая версия. Исправлены четырёхсторонний переход прозрачности и открытие раздела по строке.
 
 ## Лицензия
 
-GPL-3.0-or-later
+GPL-3.0-or-later.

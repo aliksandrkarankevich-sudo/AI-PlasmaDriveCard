@@ -1,69 +1,74 @@
 #!/usr/bin/env bash
-# install-from-github.sh — скачивает и устанавливает последний релиз Drive Cards
-# Использование: bash install-from-github.sh
-# Требования: curl, sha256sum, kpackagetool6
+# Install or upgrade Drive Cards from the latest GitHub Release.
+# Usage: bash install-from-github.sh [--version v0.95.0-beta2]
 set -euo pipefail
 
 REPO="aliksandrkarankevich-sudo/AI-PlasmaDriveCard"
-API="https://api.github.com/repos/${REPO}/releases/latest"
-PKG_ID="io.github.cachyos.drivecard"
+ID="io.github.cachyos.drivecard"
+API="https://api.github.com/repos/${REPO}"
+VERSION=""
 
-echo "==> Drive Cards: получение информации о последнем релизе..."
-if ! command -v curl &>/dev/null; then
-  echo "Ошибка: curl не найден. Установите curl и повторите попытку."
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --version) VERSION="$2"; shift 2 ;;
+    *) echo "Unknown argument: $1" >&2; exit 1 ;;
+  esac
+done
+
+command -v kpackagetool6 >/dev/null 2>&1 || {
+  echo "Ошибка: kpackagetool6 не найден." >&2
+  echo "Установите пакет plasma-framework (Arch: extra/plasma-framework)." >&2
   exit 1
-fi
-if ! command -v kpackagetool6 &>/dev/null; then
-  echo "Ошибка: kpackagetool6 не найден. Убедитесь, что Plasma 6 установлена."
-  exit 1
-fi
+}
+command -v curl >/dev/null 2>&1 || { echo "Ошибка: curl не найден." >&2; exit 1; }
 
-# Получаем URL .plasmoid и SHA256SUMS из последнего релиза
-RELEASE_JSON=$(curl -fsSL "${API}")
-PLASMOID_URL=$(echo "${RELEASE_JSON}" | grep -o '"browser_download_url": "[^"]*\.plasmoid"' | head -1 | cut -d'"' -f4)
-SHA256_URL=$(echo "${RELEASE_JSON}" | grep -o '"browser_download_url": "[^"]*SHA256SUMS"' | head -1 | cut -d'"' -f4)
-VERSION=$(echo "${RELEASE_JSON}" | grep -o '"tag_name": "[^"]*"' | head -1 | cut -d'"' -f4)
-
-if [[ -z "${PLASMOID_URL}" ]]; then
-  echo "Ошибка: не удалось найти .plasmoid в последнем релизе."
-  echo "Проверьте: https://github.com/${REPO}/releases"
-  exit 1
+if [[ -z "$VERSION" ]]; then
+  echo "→ Поиск последней версии..."
+  RELEASE_JSON=$(curl -fsSL "${API}/releases/latest")
+else
+  echo "→ Поиск версии ${VERSION}..."
+  RELEASE_JSON=$(curl -fsSL "${API}/releases/tags/${VERSION}")
 fi
 
-FILENAME=$(basename "${PLASMOID_URL}")
+TAG=$(echo "$RELEASE_JSON" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['tag_name'])")
+PLASMOID_URL=$(echo "$RELEASE_JSON" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+assets=[a for a in d.get('assets',[]) if a['name'].endswith('.plasmoid')]
+if not assets: raise SystemExit('Файл .plasmoid не найден в релизе')
+print(assets[0]['browser_download_url'])
+")
+SHA_URL=$(echo "$RELEASE_JSON" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+assets=[a for a in d.get('assets',[]) if a['name']=='SHA256SUMS']
+print(assets[0]['browser_download_url'] if assets else '')
+")
+
+FILE=$(basename "$PLASMOID_URL")
 TMPDIR=$(mktemp -d)
-trap 'rm -rf "${TMPDIR}"' EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
-echo "==> Версия: ${VERSION}"
-echo "==> Скачивание: ${FILENAME}..."
-curl -fL --progress-bar -o "${TMPDIR}/${FILENAME}" "${PLASMOID_URL}"
+echo "→ Скачиваем ${FILE} (${TAG})..."
+curl -fSL --progress-bar -o "${TMPDIR}/${FILE}" "$PLASMOID_URL"
 
-# Проверяем SHA256 если файл доступен
-if [[ -n "${SHA256_URL}" ]]; then
-  echo "==> Проверка SHA256..."
-  curl -fsSL -o "${TMPDIR}/SHA256SUMS" "${SHA256_URL}"
-  cd "${TMPDIR}"
-  if sha256sum --check --ignore-missing SHA256SUMS; then
-    echo "==> SHA256: OK"
-  else
-    echo "Ошибка: контрольная сумма не совпадает. Файл повреждён."
+if [[ -n "$SHA_URL" ]]; then
+  echo "→ Проверяем контрольную сумму..."
+  curl -fsSL -o "${TMPDIR}/SHA256SUMS" "$SHA_URL"
+  (cd "$TMPDIR" && sha256sum -c SHA256SUMS --ignore-missing) || {
+    echo "Ошибка: контрольная сумма не совпадает. Файл повреждён." >&2
     exit 1
-  fi
-  cd - >/dev/null
-else
-  echo "==> Предупреждение: файл SHA256SUMS не найден, пропускаем проверку."
+  }
 fi
 
-# Устанавливаем или обновляем
-if kpackagetool6 --type Plasma/Applet --show "${PKG_ID}" &>/dev/null; then
-  echo "==> Обновление существующей установки..."
-  kpackagetool6 --type Plasma/Applet --upgrade "${TMPDIR}/${FILENAME}"
+if kpackagetool6 --type Plasma/Applet --show "$ID" >/dev/null 2>&1; then
+  echo "→ Обновляем установленную версию..."
+  kpackagetool6 --type Plasma/Applet --upgrade "${TMPDIR}/${FILE}"
 else
-  echo "==> Установка виджета..."
-  kpackagetool6 --type Plasma/Applet --install "${TMPDIR}/${FILENAME}"
+  echo "→ Устанавливаем..."
+  kpackagetool6 --type Plasma/Applet --install "${TMPDIR}/${FILE}"
 fi
 
 echo ""
-echo "✓ Drive Cards ${VERSION} успешно установлен!"
-echo "  Добавьте виджет 'Drive Cards' на рабочий стол Plasma."
-echo "  Удаление: kpackagetool6 --type Plasma/Applet --remove ${PKG_ID}"
+echo "✓ Drive Cards ${TAG} установлен."
+echo "  Добавьте виджет 'Drive Cards' из интерфейса Plasma."
