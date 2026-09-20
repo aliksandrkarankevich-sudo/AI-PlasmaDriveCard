@@ -119,10 +119,8 @@ QQC2.ScrollView {
             currentIndex: page.cfg_iconStyle === "folder" ? 1 : (page.cfg_iconStyle === "folder-open" ? 2 : 0)
             onActivated: page.cfg_iconStyle = currentIndex === 1 ? "folder" : (currentIndex === 2 ? "folder-open" : "drive")
         }
-        Kirigami.Separator { Kirigami.FormData.isSection: true }
-        Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Активность", "Activity") }
         QQC2.CheckBox {
-            Kirigami.FormData.label: page.tr2("Дисковые операции:", "Disk operations:")
+            Kirigami.FormData.label: page.tr2("Активность:", "Activity:")
             text: page.tr2("Показывать чтение/запись", "Show read/write activity")
             checked: page.cfg_showActivity
             onToggled: page.cfg_showActivity = checked
