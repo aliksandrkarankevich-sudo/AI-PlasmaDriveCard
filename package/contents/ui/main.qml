@@ -10,8 +10,6 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
-    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
-
     readonly property bool ru: Plasmoid.configuration.language !== "en"
     readonly property int pad: Plasmoid.configuration.contentPadding
     readonly property int rowH: Plasmoid.configuration.rowHeight
@@ -22,13 +20,15 @@ PlasmoidItem {
     property bool watchersRunning: false
     property var previousIo: ({})
 
+    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
+
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
-        // Ensure trailing slash so Dolphin opens the mount point correctly
-        var url = target.endsWith("/") ? target : target + "/"
-        Qt.openUrlExternally("file://" + encodeURI(url))
+        // normalize: root stays "/", everything else strips trailing slash
+        var t = target === "/" ? target : target.replace(/\/+$/, "")
+        Qt.openUrlExternally("file://" + encodeURI(t))
     }
     function displayIcon(target, physical) {
         if (Plasmoid.configuration.iconStyle === "folder") return "folder"
@@ -263,29 +263,94 @@ PlasmoidItem {
         readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
         readonly property real baseAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
-        // edgeAlpha: opacity at the very edge (0 = fully transparent edge)
+        // edgeAlpha: fully transparent at edge when edgeOpacity==100, fully opaque when edgeOpacity==0
         readonly property real edgeAlpha: baseAlpha * (1.0 - Plasmoid.configuration.edgeOpacity / 100.0)
         readonly property real curve: Plasmoid.configuration.edgeCurve / 100.0
-        // Use shortest side so the fraction looks the same on wide and tall widgets
+        // edgeFraction: fraction of width/height used for the fade zone on each side
         readonly property real edgeFraction: Plasmoid.configuration.edgeWidth <= 0 ? 0.0
             : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1, Math.min(width, height)))
 
-        // Four-sided fade background
-        EdgeFadeBackground {
-            baseColor:    view.backgroundBase
-            baseAlpha:    view.baseAlpha
-            edgeAlpha:    view.edgeAlpha
-            edgeFraction: view.edgeFraction
-            curve:        view.curve
-            rounded:      Plasmoid.configuration.rounded
-            cornerRadius: Plasmoid.configuration.cornerRadius
+        // ---- Background: single solid rect + two gradient masks (H and V) ----
+        // Solid base at baseAlpha
+        Rectangle {
+            anchors.fill: parent
+            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                           view.backgroundBase.b, view.baseAlpha)
         }
+        // Horizontal fade mask (left + right edges)
+        Rectangle {
+            anchors.fill: parent
+            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            visible: view.edgeFraction > 0
+            color: "transparent"
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                // Position helpers for symmetric easing via curve parameter
+                // curve > 0 = faster fade (more transparent sooner)
+                // curve < 0 = slower fade (stays opaque longer before fading)
+                property real p1: Math.max(0.001, view.edgeFraction * (1.0 + view.curve))
+                property real p2: Math.min(0.499, 1.0 - Math.max(0.001, view.edgeFraction * (1.0 + view.curve)))
+                GradientStop {
+                    position: 0.0
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, view.edgeAlpha - view.baseAlpha)
+                }
+                GradientStop {
+                    position: parent.p1
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, 0)
+                }
+                GradientStop {
+                    position: parent.p2
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, 0)
+                }
+                GradientStop {
+                    position: 1.0
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, view.edgeAlpha - view.baseAlpha)
+                }
+            }
+        }
+        // Vertical fade mask (top + bottom edges)
+        Rectangle {
+            anchors.fill: parent
+            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            visible: view.edgeFraction > 0
+            color: "transparent"
+            gradient: Gradient {
+                orientation: Gradient.Vertical
+                property real p1: Math.max(0.001, view.edgeFraction * (1.0 + view.curve))
+                property real p2: Math.min(0.499, 1.0 - Math.max(0.001, view.edgeFraction * (1.0 + view.curve)))
+                GradientStop {
+                    position: 0.0
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, view.edgeAlpha - view.baseAlpha)
+                }
+                GradientStop {
+                    position: parent.p1
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, 0)
+                }
+                GradientStop {
+                    position: parent.p2
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, 0)
+                }
+                GradientStop {
+                    position: 1.0
+                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
+                                   view.backgroundBase.b, view.edgeAlpha - view.baseAlpha)
+                }
+            }
+        }
+        // ---------------------------------------------------------------------
 
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: root.pad
             spacing: 4
-            opacity: 1.0
 
             RowLayout {
                 Layout.fillWidth: true
@@ -305,7 +370,6 @@ PlasmoidItem {
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height ? QQC2.ScrollBar.AsNeeded : QQC2.ScrollBar.AlwaysOff
                 }
-
                 delegate: QQC2.ItemDelegate {
                     required property string title
                     required property string target
@@ -321,18 +385,29 @@ PlasmoidItem {
 
                     width: list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
-                    // Open the drive on click, Enter or Space
+                    // Full-row click opens the drive in the file manager
                     onClicked: root.openTarget(target)
-                    // Tooltip shows device node and mount point
+
+                    background: Rectangle {
+                        radius: Plasmoid.configuration.rounded
+                            ? Math.max(0, Plasmoid.configuration.cornerRadius - root.pad)
+                            : 0
+                        color: parent.hovered
+                            ? Qt.rgba(Kirigami.Theme.highlightColor.r,
+                                      Kirigami.Theme.highlightColor.g,
+                                      Kirigami.Theme.highlightColor.b,
+                                      parent.pressed ? 0.22 : 0.12)
+                            : "transparent"
+                        Behavior on color { ColorAnimation { duration: 120 } }
+                    }
+
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: source + "\n" + target
+                    QQC2.ToolTip.text: source + "\n" + target + "\n" + root.tr2("\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u0434\u043b\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u044f", "Click to open")
 
                     contentItem: RowLayout {
                         anchors.leftMargin: 4
                         anchors.rightMargin: 8
                         spacing: 14
-
-                        // Drive icon + activity dot
                         Item {
                             Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
@@ -345,26 +420,14 @@ PlasmoidItem {
                                 border.width: 2; border.color: Kirigami.Theme.backgroundColor
                             }
                         }
-
-                        // Labels + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
                             spacing: 4
-                            PC3.Label {
-                                text: title
-                                color: view.labelColor
-                                font.bold: true
-                                font.pixelSize: root.fontPx(18)
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
+                            PC3.Label { text: title; color: view.labelColor; font.bold: true; font.pixelSize: root.fontPx(18); elide: Text.ElideRight; Layout.fillWidth: true }
                             PC3.Label {
                                 text: root.formatBytes(available) + " " + root.tr2("\u0441\u0432\u043e\u0431\u043e\u0434\u043d\u043e \u0438\u0437", "free of") + " " + root.formatBytes(total)
-                                color: view.labelColor
-                                font.pixelSize: root.fontPx(16)
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
+                                color: view.labelColor; font.pixelSize: root.fontPx(16); elide: Text.ElideRight; Layout.fillWidth: true
                             }
                             PC3.Label {
                                 visible: Plasmoid.configuration.showFs || Plasmoid.configuration.showPhysical
@@ -373,38 +436,22 @@ PlasmoidItem {
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
                                     return a && b ? a + "  \u2022  " + b : a + b
                                 }
-                                color: view.labelColor
-                                opacity: 0.72
-                                font.pixelSize: root.fontPx(13)
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
+                                color: view.labelColor; opacity: 0.72; font.pixelSize: root.fontPx(13); elide: Text.ElideRight; Layout.fillWidth: true
                             }
                             QQC2.ProgressBar {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: Plasmoid.configuration.progressHeight
-                                from: 0; to: 100; value: used
-                                palette.highlight: used >= Plasmoid.configuration.criticalPercent
-                                    ? Kirigami.Theme.negativeTextColor
-                                    : used >= Plasmoid.configuration.warningPercent
-                                        ? Kirigami.Theme.neutralTextColor
-                                        : Kirigami.Theme.highlightColor
+                                Layout.fillWidth: true; Layout.preferredHeight: Plasmoid.configuration.progressHeight; from: 0; to: 100; value: used
+                                palette.highlight: used >= Plasmoid.configuration.criticalPercent ? Kirigami.Theme.negativeTextColor
+                                    : used >= Plasmoid.configuration.warningPercent ? Kirigami.Theme.neutralTextColor
+                                    : Kirigami.Theme.highlightColor
                             }
-                            PC3.Label {
-                                Layout.alignment: Qt.AlignRight
-                                text: used + "% " + root.tr2("\u0437\u0430\u043d\u044f\u0442\u043e", "used")
-                                color: view.labelColor
-                                font.pixelSize: root.fontPx(13)
-                            }
+                            PC3.Label { Layout.alignment: Qt.AlignRight; text: used + "% " + root.tr2("\u0437\u0430\u043d\u044f\u0442\u043e", "used"); color: view.labelColor; font.pixelSize: root.fontPx(13) }
                         }
                     }
                 }
-
                 PC3.Label {
                     anchors.centerIn: parent
                     visible: drives.count === 0
-                    text: root.scanRunning
-                        ? root.tr2("\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435\u2026", "Refreshing\u2026")
-                        : root.tr2("\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u0434\u0438\u0441\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b", "No accessible drives found")
+                    text: root.scanRunning ? root.tr2("\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435\u2026", "Refreshing\u2026") : root.tr2("\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u0434\u0438\u0441\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b", "No accessible drives found")
                     color: view.labelColor
                     opacity: 0.75
                     font.pixelSize: root.fontPx(15)
