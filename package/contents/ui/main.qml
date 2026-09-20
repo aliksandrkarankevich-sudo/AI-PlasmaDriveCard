@@ -28,7 +28,6 @@ PlasmoidItem {
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
-        // Normalise: ensure trailing slash so Dolphin opens the mount point itself
         var url = target.endsWith("/") ? target : target + "/"
         Qt.openUrlExternally("file://" + url)
     }
@@ -271,7 +270,8 @@ PlasmoidItem {
         readonly property real bandFraction: Plasmoid.configuration.edgeWidth <= 0
             ? 0.0
             : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1.0, Math.min(width, height)))
-        readonly property real curveSigned: (Plasmoid.configuration.edgeCurve - 50) / 50.0  // -1..1
+        // edgeCurve is stored as -100..100 in config; normalise to -1..1 for EdgeFadeBackground
+        readonly property real curveSigned: Plasmoid.configuration.edgeCurve / 100.0
 
         // Four-sided fade background
         EdgeFadeBackground {
@@ -325,18 +325,14 @@ PlasmoidItem {
                     width: list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
 
-                    // Whole row opens the drive/mount
                     onClicked: root.openTarget(target)
 
-                    // Pointer cursor while hovering
                     HoverHandler { cursorShape: Qt.PointingHandCursor }
 
-                    // Tooltip on the row
                     QQC2.ToolTip.visible: hovered
                     QQC2.ToolTip.text: source + "\n" + target + "\n" + root.tr2("Нажмите, чтобы открыть", "Click to open")
                     QQC2.ToolTip.delay: 600
 
-                    // Keep ItemDelegate background transparent; EdgeFadeBackground paints the widget bg
                     background: Rectangle {
                         color: "transparent"
                         Rectangle {
@@ -353,7 +349,6 @@ PlasmoidItem {
                         anchors.rightMargin: 4
                         spacing: 14
 
-                        // Drive icon + activity dot
                         Item {
                             Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
@@ -367,7 +362,6 @@ PlasmoidItem {
                             }
                         }
 
-                        // Text + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
