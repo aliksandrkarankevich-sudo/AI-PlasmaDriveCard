@@ -1,114 +1,71 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Four-sided edge-fade background for Drive Cards 0.95.0-beta2
 import QtQuick
 
 Item {
-    id: root
+    id: bg
 
-    property color baseColor: "#20242b"
-    property real backgroundOpacity: 0.4
-    property real edgeTransparency: 1.0
-    property real fadeWidth: 30
-    property real curve: 0.0
-    property bool rounded: true
-    property real cornerRadius: 15
+    // Exposed properties — bound by parent
+    property color  baseColor
+    property real   centerAlpha   // opacity of the solid centre
+    property real   edgeAlpha     // opacity at the four edges (0 = fully transparent)
+    property real   fraction      // 0..0.45  width of the fade band, as fraction of the shorter side
+    property real   curve         // -1..1    shape of the fade (negative = slow-in, positive = fast-in)
+    property int    radius: 0
 
-    function alphaColor(alpha) {
-        return "rgba(255,255,255," + Math.max(0, Math.min(1, alpha)) + ")"
+    // Resolved mid-stops derived from curve
+    readonly property real midPos:   0.50
+    readonly property real midAlpha: {
+        // Hermite-like blend: at curve=0 linear; curve<0 stays near edgeAlpha longer;
+        // curve>0 reaches centerAlpha faster
+        var t = 0.5
+        if (curve < 0) t = Math.pow(0.5, 1.0 + Math.abs(curve))
+        else           t = 1.0 - Math.pow(0.5, 1.0 + curve)
+        return edgeAlpha + t * (centerAlpha - edgeAlpha)
     }
+    readonly property real bandH: Math.max(0, fraction) // horizontal band
+    readonly property real bandV: Math.max(0, fraction) // vertical band
 
-    function addFadeStops(gradient, fraction) {
-        var edge = Math.max(0, Math.min(1, 1.0 - root.edgeTransparency))
-        if (fraction <= 0 || edge >= 0.999) {
-            gradient.addColorStop(0.0, "white")
-            gradient.addColorStop(1.0, "white")
-            return
-        }
-
-        var exponent = Math.pow(4.0, Math.max(-1, Math.min(1, root.curve)))
-        var steps = 8
-        for (var i = 0; i <= steps; ++i) {
-            var t = i / steps
-            var alpha = edge + (1.0 - edge) * Math.pow(t, exponent)
-            gradient.addColorStop(fraction * t, root.alphaColor(alpha))
-        }
-        for (var j = 0; j <= steps; ++j) {
-            var rt = j / steps
-            var ralpha = 1.0 - (1.0 - edge) * Math.pow(rt, 1.0 / exponent)
-            gradient.addColorStop(1.0 - fraction + fraction * rt, root.alphaColor(ralpha))
-        }
-    }
-
-    function roundedPath(ctx, width, height, radius) {
-        var r = Math.max(0, Math.min(radius, Math.min(width, height) / 2))
-        ctx.beginPath()
-        if (r <= 0) {
-            ctx.rect(0, 0, width, height)
-        } else {
-            ctx.moveTo(r, 0)
-            ctx.lineTo(width - r, 0)
-            ctx.quadraticCurveTo(width, 0, width, r)
-            ctx.lineTo(width, height - r)
-            ctx.quadraticCurveTo(width, height, width - r, height)
-            ctx.lineTo(r, height)
-            ctx.quadraticCurveTo(0, height, 0, height - r)
-            ctx.lineTo(0, r)
-            ctx.quadraticCurveTo(0, 0, r, 0)
-        }
-        ctx.closePath()
-    }
-
-    Canvas {
-        id: canvas
+    // 1. Solid centre rectangle
+    Rectangle {
         anchors.fill: parent
-        antialiasing: true
-        renderStrategy: Canvas.Cooperative
-
-        onPaint: {
-            var ctx = getContext("2d")
-            var w = width
-            var h = height
-            ctx.clearRect(0, 0, w, h)
-            if (w <= 0 || h <= 0 || root.backgroundOpacity <= 0) return
-
-            ctx.globalCompositeOperation = "source-over"
-            root.roundedPath(ctx, w, h, root.rounded ? root.cornerRadius : 0)
-            ctx.fillStyle = "rgba(" + Math.round(root.baseColor.r * 255) + ","
-                + Math.round(root.baseColor.g * 255) + ","
-                + Math.round(root.baseColor.b * 255) + ","
-                + Math.max(0, Math.min(1, root.backgroundOpacity)) + ")"
-            ctx.fill()
-
-            var horizontalFraction = Math.min(0.5, Math.max(0, root.fadeWidth) / Math.max(1, w))
-            var verticalFraction = Math.min(0.5, Math.max(0, root.fadeWidth) / Math.max(1, h))
-
-            if (horizontalFraction > 0 && root.edgeTransparency > 0) {
-                ctx.globalCompositeOperation = "destination-in"
-                var horizontal = ctx.createLinearGradient(0, 0, w, 0)
-                root.addFadeStops(horizontal, horizontalFraction)
-                ctx.fillStyle = horizontal
-                ctx.fillRect(0, 0, w, h)
-            }
-
-            if (verticalFraction > 0 && root.edgeTransparency > 0) {
-                ctx.globalCompositeOperation = "destination-in"
-                var vertical = ctx.createLinearGradient(0, 0, 0, h)
-                root.addFadeStops(vertical, verticalFraction)
-                ctx.fillStyle = vertical
-                ctx.fillRect(0, 0, w, h)
-            }
-
-            ctx.globalCompositeOperation = "source-over"
-        }
-
-        onWidthChanged: requestPaint()
-        onHeightChanged: requestPaint()
+        radius: bg.radius
+        color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.centerAlpha)
     }
 
-    onBaseColorChanged: canvas.requestPaint()
-    onBackgroundOpacityChanged: canvas.requestPaint()
-    onEdgeTransparencyChanged: canvas.requestPaint()
-    onFadeWidthChanged: canvas.requestPaint()
-    onCurveChanged: canvas.requestPaint()
-    onRoundedChanged: canvas.requestPaint()
-    onCornerRadiusChanged: canvas.requestPaint()
-    Component.onCompleted: canvas.requestPaint()
+    // 2. Horizontal fade mask (left and right edges)
+    Rectangle {
+        anchors.fill: parent
+        radius: bg.radius
+        color: "transparent"
+        visible: bg.bandH > 0
+        gradient: Gradient {
+            orientation: Gradient.Horizontal
+            // left edge: edgeAlpha → centerAlpha
+            GradientStop { position: 0.0;                                     color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.edgeAlpha   - bg.centerAlpha) }
+            GradientStop { position: bg.bandH * 0.5;                          color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.midAlpha    - bg.centerAlpha) }
+            GradientStop { position: bg.bandH;                                color: Qt.rgba(0, 0, 0, 0) }
+            // right mirror
+            GradientStop { position: 1.0 - bg.bandH;                         color: Qt.rgba(0, 0, 0, 0) }
+            GradientStop { position: 1.0 - bg.bandH * 0.5;                   color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.midAlpha    - bg.centerAlpha) }
+            GradientStop { position: 1.0;                                     color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.edgeAlpha   - bg.centerAlpha) }
+        }
+    }
+
+    // 3. Vertical fade mask (top and bottom edges)
+    Rectangle {
+        anchors.fill: parent
+        radius: bg.radius
+        color: "transparent"
+        visible: bg.bandV > 0
+        gradient: Gradient {
+            orientation: Gradient.Vertical
+            GradientStop { position: 0.0;                                     color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.edgeAlpha   - bg.centerAlpha) }
+            GradientStop { position: bg.bandV * 0.5;                          color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.midAlpha    - bg.centerAlpha) }
+            GradientStop { position: bg.bandV;                                color: Qt.rgba(0, 0, 0, 0) }
+            GradientStop { position: 1.0 - bg.bandV;                         color: Qt.rgba(0, 0, 0, 0) }
+            GradientStop { position: 1.0 - bg.bandV * 0.5;                   color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.midAlpha    - bg.centerAlpha) }
+            GradientStop { position: 1.0;                                     color: Qt.rgba(bg.baseColor.r, bg.baseColor.g, bg.baseColor.b, bg.edgeAlpha   - bg.centerAlpha) }
+        }
+    }
 }

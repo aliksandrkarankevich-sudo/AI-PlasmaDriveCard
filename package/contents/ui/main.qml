@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Drive Cards — 0.95.0-beta2
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -26,10 +28,9 @@ PlasmoidItem {
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
-        // Нормализуем путь: добавляем завершающий / для корня и точек монтирования
-        var path = target
-        if (path !== "/" && !path.endsWith("/")) path = path + "/"
-        Qt.openUrlExternally("file://" + path)
+        // Normalise: ensure trailing slash so Dolphin opens the mount point itself
+        var url = target.endsWith("/") ? target : target + "/"
+        Qt.openUrlExternally("file://" + url)
     }
     function displayIcon(target, physical) {
         if (Plasmoid.configuration.iconStyle === "folder") return "folder"
@@ -85,7 +86,7 @@ PlasmoidItem {
         var lsblkData
         try {
             findmntData = JSON.parse(output.substring(0, markerIndex).trim())
-            lsblkData = JSON.parse(output.substring(markerIndex + marker.length).trim())
+            lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
             return
@@ -264,128 +265,30 @@ PlasmoidItem {
         readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
         readonly property real baseAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
-        // Альфа края: 0 = полностью прозрачный, edgeOpacity 100% = такой же как центр
-        readonly property real edgeAlpha: baseAlpha * Plasmoid.configuration.edgeOpacity / 100.0
-        readonly property real curve: Plasmoid.configuration.edgeCurve / 100.0
-        // Доля ширины/высоты виджета, занятая переходом (не более 45%)
-        readonly property real edgeFracH: Plasmoid.configuration.edgeWidth <= 0 ? 0.0
-            : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1, width))
-        readonly property real edgeFracV: Plasmoid.configuration.edgeWidth <= 0 ? 0.0
-            : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1, height))
-        // Точки перехода с учётом кривой (симметрично для обеих сторон)
-        readonly property real fadeStop: {
-            var base = edgeFracH
-            var k = 1.0 + Math.abs(curve) * 0.7
-            return Math.min(0.45, base * k)
-        }
-        readonly property real fadeStopV: {
-            var base = edgeFracV
-            var k = 1.0 + Math.abs(curve) * 0.7
-            return Math.min(0.45, base * k)
-        }
+        readonly property real edgeAlpha: Plasmoid.configuration.edgeOpacity === 100
+            ? 0.0
+            : baseAlpha * (Plasmoid.configuration.edgeOpacity / 100.0)
+        readonly property real bandFraction: Plasmoid.configuration.edgeWidth <= 0
+            ? 0.0
+            : Math.min(0.45, Plasmoid.configuration.edgeWidth / Math.max(1.0, Math.min(width, height)))
+        readonly property real curveSigned: (Plasmoid.configuration.edgeCurve - 50) / 50.0  // -1..1
 
-        // ── Слой 1: базовый фон центральной части ──────────────────────────
-        Rectangle {
+        // Four-sided fade background
+        EdgeFadeBackground {
             anchors.fill: parent
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                           view.backgroundBase.b, view.baseAlpha)
-        }
-
-        // ── Слой 2: горизонтальный переход (левый и правый края) ───────────
-        Rectangle {
-            anchors.fill: parent
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            visible: view.edgeFracH > 0
-            color: "transparent"
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop {
-                    position: 0.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha > view.baseAlpha ? view.baseAlpha : view.edgeAlpha)
-                }
-                GradientStop {
-                    position: view.fadeStop * 0.4
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha + (view.baseAlpha - view.edgeAlpha) * 0.5)
-                }
-                GradientStop {
-                    position: view.fadeStop
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0.0)
-                }
-                GradientStop {
-                    position: 1.0 - view.fadeStop
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0.0)
-                }
-                GradientStop {
-                    position: 1.0 - view.fadeStop * 0.4
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha + (view.baseAlpha - view.edgeAlpha) * 0.5)
-                }
-                GradientStop {
-                    position: 1.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha > view.baseAlpha ? view.baseAlpha : view.edgeAlpha)
-                }
-            }
-        }
-
-        // ── Слой 3: вертикальный переход (верхний и нижний края) ───────────
-        Rectangle {
-            anchors.fill: parent
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            visible: view.edgeFracV > 0
-            color: "transparent"
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop {
-                    position: 0.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha > view.baseAlpha ? view.baseAlpha : view.edgeAlpha)
-                }
-                GradientStop {
-                    position: view.fadeStopV * 0.4
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha + (view.baseAlpha - view.edgeAlpha) * 0.5)
-                }
-                GradientStop {
-                    position: view.fadeStopV
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0.0)
-                }
-                GradientStop {
-                    position: 1.0 - view.fadeStopV
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b, 0.0)
-                }
-                GradientStop {
-                    position: 1.0 - view.fadeStopV * 0.4
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha + (view.baseAlpha - view.edgeAlpha) * 0.5)
-                }
-                GradientStop {
-                    position: 1.0
-                    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                                   view.backgroundBase.b,
-                                   view.edgeAlpha > view.baseAlpha ? view.baseAlpha : view.edgeAlpha)
-                }
-            }
+            baseColor:    view.backgroundBase
+            centerAlpha:  view.baseAlpha
+            edgeAlpha:    view.edgeAlpha
+            fraction:     view.bandFraction
+            curve:        view.curveSigned
+            radius:       Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
         }
 
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: root.pad
             spacing: 4
+            opacity: 1.0
 
             RowLayout {
                 Layout.fillWidth: true
@@ -414,35 +317,43 @@ PlasmoidItem {
                     required property string physical
                     required property double total
                     required property double available
-                    required property int used
+                    required property int    used
                     required property string icon
                     required property string kname
-                    required property bool active
+                    required property bool   active
 
                     width: list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
-                    hoverEnabled: true
 
-                    // Подсказка: источник и точка монтирования
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: source + "\n" + target
-                    QQC2.ToolTip.delay: 600
-
-                    // Открытие раздела по нажатию на всю строку
+                    // Whole row opens the drive/mount
                     onClicked: root.openTarget(target)
 
-                    // Курсор-указатель при наведении
-                    MouseArea {
-                        anchors.fill: parent
-                        acceptedButtons: Qt.NoButton
-                        cursorShape: Qt.PointingHandCursor
+                    // Pointer cursor while hovering
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+
+                    // Tooltip on the row
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.text: source + "\n" + target + "\n" + root.tr2("Нажмите, чтобы открыть", "Click to open")
+                    QQC2.ToolTip.delay: 600
+
+                    // Keep ItemDelegate background transparent; EdgeFadeBackground paints the widget bg
+                    background: Rectangle {
+                        color: "transparent"
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 6
+                            color: Kirigami.Theme.highlightColor
+                            opacity: parent.parent.hovered ? 0.10 : 0.0
+                            Behavior on opacity { NumberAnimation { duration: 120 } }
+                        }
                     }
 
                     contentItem: RowLayout {
                         anchors.leftMargin: 4
-                        anchors.rightMargin: 8
+                        anchors.rightMargin: 4
                         spacing: 14
 
+                        // Drive icon + activity dot
                         Item {
                             Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
@@ -456,13 +367,15 @@ PlasmoidItem {
                             }
                         }
 
+                        // Text + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
                             spacing: 4
                             PC3.Label {
-                                text: title; color: view.labelColor
-                                font.bold: true; font.pixelSize: root.fontPx(18)
+                                text: title
+                                color: view.labelColor; font.bold: true
+                                font.pixelSize: root.fontPx(18)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
                             PC3.Label {
