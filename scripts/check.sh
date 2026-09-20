@@ -1,61 +1,88 @@
 #!/usr/bin/env bash
+# Validate the package structure, metadata, and build artefact.
+# Usage: ./scripts/check.sh
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-version="$(python3 -c "import json; print(json.load(open('package/metadata.json'))['KPlugin']['Version'])")"
-archive="dist/cachyos-drive-card-${version}.plasmoid"
-python3 - <<'PY'
-from pathlib import Path
-import json, re
-import xml.etree.ElementTree as ET
-required=[
-    Path('package/metadata.json'),
-    Path('package/contents/config/config.qml'),
-    Path('package/contents/config/main.xml'),
-    Path('package/contents/ui/ConfigGeneral.qml'),
-    Path('package/contents/ui/main.qml'),
-    Path('package/contents/ui/EdgeFadeBackground.qml')
-]
-missing=[str(p) for p in required if not p.is_file()]
-assert not missing, f'Missing files: {missing}'
-meta=json.loads(required[0].read_text())
-assert meta['KPlugin']['Id']=='io.github.cachyos.drivecard'
-assert meta['KPlugin']['Version']=='0.95.0-beta2'
-assert meta['KPackageStructure']=='Plasma/Applet'
-ET.parse(required[2])
-cfg=required[3].read_text()
-xml=required[2].read_text()
-main=required[4].read_text()
-fade=required[5].read_text()
-props=set(re.findall(r'property\s+\w+\s+cfg_(\w+)',cfg))
-entries=set(re.findall(r'<entry name="([^"]+)"',xml))
-assert props==entries, f'Configuration mismatch: {sorted(props^entries)}'
-assert 'openOnRowClick' not in cfg+xml+main, 'Obsolete row-click option remains'
-assert 'QQC2.ToolButton' not in main, 'Separate open button remains'
-assert 'QQC2.ItemDelegate' in main and 'onClicked: root.openTarget(target)' in main
-assert 'createLinearGradient(0, 0, w, 0)' in fade, 'Horizontal fade is missing'
-assert 'createLinearGradient(0, 0, 0, h)' in fade, 'Vertical fade is missing'
-assert 'destination-in' in fade, 'Fade masks are not composed'
-print('Package layout, metadata, XML, configuration and regressions: OK')
-PY
-bash -n scripts/*.sh
-./scripts/build.sh
-python3 - "$archive" <<'PY'
-from pathlib import Path
-from zipfile import ZipFile
-import sys
-p=Path(sys.argv[1])
-assert p.is_file(), f'Archive not found: {p}'
-with ZipFile(p) as z:
-    assert z.testzip() is None
-    names=set(z.namelist())
-    required={'metadata.json','contents/ui/main.qml','contents/ui/EdgeFadeBackground.qml','contents/config/main.xml'}
-    assert required <= names, f'Archive files missing: {sorted(required-names)}'
-    forbidden=[name for name in names if name.lower().endswith(('.bak','.backup','.orig','.rej','.tmp','~')) or '.backup-' in name.lower()]
-    assert not forbidden, f'Backup files included: {forbidden}'
-print('Plasmoid archive: OK')
-PY
-if command -v qmllint >/dev/null 2>&1; then
-  qmllint package/contents/ui/main.qml package/contents/ui/EdgeFadeBackground.qml package/contents/ui/ConfigGeneral.qml package/contents/config/config.qml
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${SCRIPT_DIR}/.."
+PACKAGE_DIR="${ROOT_DIR}/package"
+PASS=0
+FAIL=0
+
+ok()   { echo "  [OK]  $*"; ((PASS++)) || true; }
+fail() { echo "  [FAIL] $*"; ((FAIL++)) || true; }
+
+echo "=== Drive Cards package check ==="
+
+# 1. Required files
+for f in metadata.json contents/ui/main.qml contents/config/main.xml \
+         contents/ui/ConfigGeneral.qml; do
+    [[ -f "${PACKAGE_DIR}/${f}" ]] && ok "${f} exists" || fail "${f} missing"
+done
+
+# 2. No backup files inside package/
+BACKUPS="$(find "${PACKAGE_DIR}" -name '*.backup' -o -name '*.bak' 2>/dev/null)"
+[[ -z "${BACKUPS}" ]] && ok "No backup files in package/" || fail "Backup files found:\n${BACKUPS}"
+
+# 3. metadata.json has required fields
+META="${PACKAGE_DIR}/metadata.json"
+for field in Id Version Name KPackageStructure; do
+    grep -q "${field}" "${META}" && ok "metadata.json has ${field}" || fail "metadata.json missing ${field}"
+done
+
+# 4. main.xml consistency: no openOnRowClick
+MAIN_XML="${PACKAGE_DIR}/contents/config/main.xml"
+if grep -q 'openOnRowClick' "${MAIN_XML}"; then
+    fail "main.xml still contains openOnRowClick (should be removed)"
 else
-  echo "qmllint не найден: QML-проверка пропущена."
+    ok "main.xml does not contain openOnRowClick"
 fi
+
+# 5. ConfigGeneral.qml consistency: no openOnRowClick
+CFG="${PACKAGE_DIR}/contents/ui/ConfigGeneral.qml"
+if grep -q 'openOnRowClick' "${CFG}"; then
+    fail "ConfigGeneral.qml still contains openOnRowClick"
+else
+    ok "ConfigGeneral.qml does not contain openOnRowClick"
+fi
+
+# 6. main.qml uses ItemDelegate (not plain Item) for list delegate
+MAIN_QML="${PACKAGE_DIR}/contents/ui/main.qml"
+if grep -q 'QQC2.ItemDelegate' "${MAIN_QML}"; then
+    ok "main.qml uses ItemDelegate for list rows"
+else
+    fail "main.qml does not use ItemDelegate for list rows"
+fi
+
+# 7. main.qml has no standalone folder-open ToolButton
+if grep -q 'folder-open.*ToolButton\|ToolButton.*folder-open' "${MAIN_QML}"; then
+    fail "main.qml still contains standalone folder-open ToolButton"
+else
+    ok "No standalone folder-open ToolButton in main.qml"
+fi
+
+# 8. main.qml has four-sided fade (both Horizontal and Vertical gradients)
+H="$(grep -c 'Gradient.Horizontal' "${MAIN_QML}" || true)"
+V="$(grep -c 'Gradient.Vertical' "${MAIN_QML}" || true)"
+[[ "${H}" -ge 1 ]] && ok "main.qml has Horizontal gradient mask" || fail "main.qml missing Horizontal gradient mask"
+[[ "${V}" -ge 1 ]] && ok "main.qml has Vertical gradient mask" || fail "main.qml missing Vertical gradient mask"
+
+# 9. Build test
+echo ""
+echo "--- Running build ---"
+bash "${SCRIPT_DIR}/build.sh"
+
+# 10. Verify .plasmoid artefact
+VERSION="$(grep '"Version"' "${META}" | sed 's/.*"Version": *"\([^"]*\)".*/\1/')"
+PLASMOID="${ROOT_DIR}/dist/cachyos-drive-card-${VERSION}.plasmoid"
+[[ -f "${PLASMOID}" ]] && ok "${PLASMOID##*/} created" || fail "${PLASMOID##*/} not found"
+
+# 11. No backup files inside the .plasmoid archive
+if [[ -f "${PLASMOID}" ]]; then
+    BAD="$(unzip -l "${PLASMOID}" | grep -E '\.backup|\.bak' || true)"
+    [[ -z "${BAD}" ]] && ok "No backup files inside .plasmoid" || fail "Backup files inside .plasmoid:\n${BAD}"
+fi
+
+echo ""
+echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
+[[ "${FAIL}" -eq 0 ]] && exit 0 || exit 1

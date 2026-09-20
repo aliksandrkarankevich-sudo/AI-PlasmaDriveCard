@@ -1,92 +1,73 @@
 #!/usr/bin/env bash
-# install-from-github.sh — download and install the latest Drive Cards release
-# Usage: bash install-from-github.sh [--prerelease]
+# Download and install the latest Drive Cards release from GitHub.
+# Usage: bash install-from-github.sh
+#
+# Inspect this script before running:
+#   curl -LO https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh
+#   less install-from-github.sh
+#   bash install-from-github.sh
 set -euo pipefail
 
 REPO="aliksandrkarankevich-sudo/AI-PlasmaDriveCard"
-API="https://api.github.com/repos/${REPO}/releases"
-PRERELEASE=false
-[[ "${1:-}" == "--prerelease" ]] && PRERELEASE=true
+TOOL="kpackagetool6"
+TYPE="Plasma/Applet"
+ID="io.github.cachyos.drivecard"
+API="https://api.github.com/repos/${REPO}/releases/latest"
 
-if ! command -v kpackagetool6 &>/dev/null; then
-    echo "ERROR: kpackagetool6 not found. Please install plasma-framework or kde-plasma-desktop."
+if ! command -v "${TOOL}" &>/dev/null; then
+    echo "Error: ${TOOL} not found. Install plasma-framework or plasma6-sdk."
     exit 1
 fi
 if ! command -v curl &>/dev/null; then
-    echo "ERROR: curl not found."
+    echo "Error: curl not found."
     exit 1
 fi
 
-echo "Fetching release list from GitHub..."
-RELEASES=$(curl -fsSL "${API}")
-
-# Pick latest stable or, if --prerelease, the latest of any kind
-if $PRERELEASE; then
-    RELEASE=$(echo "${RELEASES}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for r in data:
-    print(json.dumps(r)); break
-")
-else
-    RELEASE=$(echo "${RELEASES}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-for r in data:
-    if not r.get('prerelease') and not r.get('draft'):
-        print(json.dumps(r)); break
-")
-fi
-
-if [[ -z "${RELEASE}" ]]; then
-    echo "No suitable release found. Try --prerelease to install the latest beta."
+echo "Fetching release info from GitHub..."
+RELEASE_JSON="$(curl -fsSL "${API}")"
+TAG="$(echo "${RELEASE_JSON}" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+if [[ -z "${TAG}" ]]; then
+    echo "Error: could not determine latest release tag."
     exit 1
 fi
+echo "Latest release: ${TAG}"
 
-TAG=$(echo "${RELEASE}" | python3 -c "import sys,json; r=json.loads(sys.stdin.read()); print(r['tag_name'])")
-PLASMOID_URL=$(echo "${RELEASE}" | python3 -c "
-import sys, json
-r = json.loads(sys.stdin.read())
-for a in r.get('assets', []):
-    if a['name'].endswith('.plasmoid'):
-        print(a['browser_download_url']); break
-")
-SHA_URL=$(echo "${RELEASE}" | python3 -c "
-import sys, json
-r = json.loads(sys.stdin.read())
-for a in r.get('assets', []):
-    if a['name'] == 'SHA256SUMS':
-        print(a['browser_download_url']); break
-")
-
-if [[ -z "${PLASMOID_URL}" ]]; then
-    echo "ERROR: No .plasmoid asset found in release ${TAG}."
+# Find the .plasmoid asset URL
+ASSET_URL="$(echo "${RELEASE_JSON}" | grep 'browser_download_url' | grep '\.plasmoid"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')"
+if [[ -z "${ASSET_URL}" ]]; then
+    echo "Error: no .plasmoid file found in release ${TAG}."
     exit 1
 fi
+FILE="$(basename "${ASSET_URL}")"
 
-FILE=$(basename "${PLASMOID_URL}")
-TMPDIR=$(mktemp -d)
+# Optional SHA256 verification
+SHA_URL="$(echo "${RELEASE_JSON}" | grep 'browser_download_url' | grep 'SHA256SUMS"' | head -1 | sed 's/.*"browser_download_url": *"\([^"]*\)".*/\1/')"
+
+TMPDIR="$(mktemp -d)"
 trap 'rm -rf "${TMPDIR}"' EXIT
 
-echo "Downloading ${TAG}: ${FILE}"
-curl -fsSL -o "${TMPDIR}/${FILE}" "${PLASMOID_URL}"
+echo "Downloading ${FILE}..."
+curl -fsSL -o "${TMPDIR}/${FILE}" "${ASSET_URL}"
 
-if [[ -n "${SHA_URL}" ]]; then
+if [[ -n "${SHA_URL}" ]] && command -v sha256sum &>/dev/null; then
     echo "Verifying checksum..."
     curl -fsSL -o "${TMPDIR}/SHA256SUMS" "${SHA_URL}"
-    (cd "${TMPDIR}" && grep "${FILE}" SHA256SUMS | sha256sum -c -)
+    (cd "${TMPDIR}" && grep "${FILE}" SHA256SUMS | sha256sum --check --status)
+    echo "Checksum OK."
 else
-    echo "WARNING: No SHA256SUMS found — skipping checksum verification."
+    echo "Skipping checksum verification."
 fi
 
-if kpackagetool6 --type Plasma/Applet --list 2>/dev/null | grep -q "io.github.cachyos.drivecard"; then
-    echo "Upgrading existing installation..."
-    kpackagetool6 --type Plasma/Applet --upgrade "${TMPDIR}/${FILE}"
+if "${TOOL}" --type "${TYPE}" --show "${ID}" &>/dev/null; then
+    echo "Upgrading existing installation to ${TAG}..."
+    "${TOOL}" --type "${TYPE}" --upgrade "${TMPDIR}/${FILE}"
 else
-    echo "Installing Drive Cards..."
-    kpackagetool6 --type Plasma/Applet --install "${TMPDIR}/${FILE}"
+    echo "Installing Drive Cards ${TAG}..."
+    "${TOOL}" --type "${TYPE}" --install "${TMPDIR}/${FILE}"
 fi
 
-echo
-echo "Done! Drive Cards ${TAG} installed."
-echo "Add the widget from the desktop context menu → Add Widgets → Drive Cards."
+echo ""
+echo "Drive Cards ${TAG} installed successfully."
+echo "Add or re-add the widget from the Plasma widget browser."
+echo "To restart Plasma shell:"
+echo "  kquitapp6 plasmashell && kstart plasmashell"

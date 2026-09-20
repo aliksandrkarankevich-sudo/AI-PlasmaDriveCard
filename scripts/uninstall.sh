@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
-# Remove Drive Cards Plasma widget.
+# Remove the Drive Cards plasmoid.
+# Usage: ./scripts/uninstall.sh
 set -euo pipefail
+
+TOOL="kpackagetool6"
+TYPE="Plasma/Applet"
 ID="io.github.cachyos.drivecard"
 
-command -v kpackagetool6 >/dev/null 2>&1 || {
-  echo "Ошибка: kpackagetool6 не найден." >&2; exit 1
-}
-
-if kpackagetool6 --type Plasma/Applet --show "$ID" >/dev/null 2>&1; then
-  kpackagetool6 --type Plasma/Applet --remove "$ID"
-  echo "✓ Drive Cards удалён."
-else
-  echo "Drive Cards не установлен." >&2
-  exit 1
+if ! command -v "${TOOL}" &>/dev/null; then
+    echo "Error: ${TOOL} not found."
+    exit 1
 fi
+
+if ! "${TOOL}" --type "${TYPE}" --show "${ID}" &>/dev/null; then
+    echo "Drive Cards is not installed."
+    exit 0
+fi
+
+echo "Removing Drive Cards..."
+"${TOOL}" --type "${TYPE}" --remove "${ID}"
+echo "Done."

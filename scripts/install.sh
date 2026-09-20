@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
-# install.sh — build and install Drive Cards from a local Git clone
+# Install or upgrade Drive Cards from a local Git clone.
+# Usage: ./scripts/install.sh
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PACKAGE_DIR="${SCRIPT_DIR}/../package"
+TOOL="kpackagetool6"
+TYPE="Plasma/Applet"
+ID="io.github.cachyos.drivecard"
 
-if ! command -v kpackagetool6 &>/dev/null; then
-    echo "ERROR: kpackagetool6 not found."
+if ! command -v "${TOOL}" &>/dev/null; then
+    echo "Error: ${TOOL} not found. Install plasma-framework or plasma6-sdk."
     exit 1
 fi
 
-bash "${ROOT}/scripts/build.sh"
-
-VERSION=$(python3 -c "import json; print(json.load(open('${ROOT}/package/metadata.json'))['KPlugin']['Version'])")
-FILE="${ROOT}/dist/cachyos-drive-card-${VERSION}.plasmoid"
-
-if kpackagetool6 --type Plasma/Applet --list 2>/dev/null | grep -q "io.github.cachyos.drivecard"; then
+if "${TOOL}" --type "${TYPE}" --show "${ID}" &>/dev/null; then
     echo "Upgrading existing installation..."
-    kpackagetool6 --type Plasma/Applet --upgrade "${FILE}"
+    "${TOOL}" --type "${TYPE}" --upgrade "${PACKAGE_DIR}"
+    echo "Done. Restart Plasma to apply changes:"
+    echo "  kquitapp6 plasmashell && kstart plasmashell"
 else
     echo "Installing Drive Cards..."
-    kpackagetool6 --type Plasma/Applet --install "${FILE}"
+    "${TOOL}" --type "${TYPE}" --install "${PACKAGE_DIR}"
+    echo "Done. Add the widget from the Plasma widget browser."
 fi
-
-echo "Done! Drive Cards ${VERSION} installed."

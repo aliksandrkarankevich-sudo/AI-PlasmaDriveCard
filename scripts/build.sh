@@ -1,26 +1,38 @@
 #!/usr/bin/env bash
-# build.sh — package Drive Cards into a .plasmoid archive
+# Build the .plasmoid package from the package/ directory.
+# Usage: ./scripts/build.sh
+# Output: dist/cachyos-drive-card-<version>.plasmoid
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION=$(python3 -c "import json; print(json.load(open('${ROOT}/package/metadata.json'))['KPlugin']['Version'])")
-OUT="${ROOT}/dist/cachyos-drive-card-${VERSION}.plasmoid"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${SCRIPT_DIR}/.."
+PACKAGE_DIR="${ROOT_DIR}/package"
+DIST_DIR="${ROOT_DIR}/dist"
 
-mkdir -p "${ROOT}/dist"
+# Read version from metadata.json
+VERSION="$(grep '"Version"' "${PACKAGE_DIR}/metadata.json" | sed 's/.*"Version": *"\([^"]*\)".*/\1/')"
+if [[ -z "${VERSION}" ]]; then
+    echo "Error: could not read Version from metadata.json"
+    exit 1
+fi
 
-# Remove old artefacts for this version
-rm -f "${OUT}"
+OUTPUT="${DIST_DIR}/cachyos-drive-card-${VERSION}.plasmoid"
+mkdir -p "${DIST_DIR}"
 
-cd "${ROOT}/package"
-
-# Exclude backup files, editor swap files, and macOS metadata
-zip -r "${OUT}" . \
-    --exclude '*.backup*' \
+# Build zip, excluding backups, test files, and editor artefacts
+cd "${PACKAGE_DIR}"
+zip -r "${OUTPUT}" . \
+    --exclude '*.backup' \
     --exclude '*.bak' \
-    --exclude '*.orig' \
     --exclude '*~' \
     --exclude '*.swp' \
-    --exclude '__MACOSX/*' \
+    --exclude 'design-test.html' \
+    --exclude '__pycache__/*' \
     --exclude '.DS_Store'
 
-echo "Built: ${OUT}"
+echo "Built: ${OUTPUT}"
+
+# Generate SHA256 checksum
+cd "${DIST_DIR}"
+sha256sum "cachyos-drive-card-${VERSION}.plasmoid" > SHA256SUMS
+echo "Checksum: ${DIST_DIR}/SHA256SUMS"
