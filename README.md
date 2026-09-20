@@ -1,64 +1,89 @@
-# Drive Cards
+# Drive Cards — Plasma Widget
 
-![Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)
-![Version](https://img.shields.io/badge/version-0.95.0--beta1-orange)
-![License](https://img.shields.io/badge/license-GPL--3.0--or--later-green)
+A configurable Plasma 6 widget that shows mounted local filesystems as cards with usage bars, activity indicators, and transparent backgrounds.
 
-Небольшой полупрозрачный виджет дисков для KDE Plasma 6 и CachyOS. Показывает смонтированные локальные разделы, свободное место, файловую систему и краткое имя физического накопителя.
+## Installation
 
-English: a compact configurable drive-card widget for KDE Plasma 6.
+### Option 1 — Download from GitHub Releases (recommended)
 
-## Возможности
+1. Go to [Releases](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases).
+2. Download the latest `cachyos-drive-card-*.plasmoid`.
+3. Right-click the desktop → **Add Widgets** → **Install Widget from Local File** → select the file.
 
-- Русский и английский интерфейс.
-- Автоматическая высота при изменении числа разделов.
-- Открытие раздела кнопкой папки или нажатием по строке.
-- Значки диска, папки и открытой папки.
-- Масштаб текста и толщина индикатора заполнения.
-- Цвета и прозрачность фона и текста.
-- Настраиваемые скругления и прозрачные края.
-- Индикатор операций чтения/записи.
-- Автообновление после подключения и отключения накопителя.
-
-## Установка beta1
-
-Скачайте `.plasmoid` из Releases и выполните:
+Or install from the terminal:
 
 ```bash
-kpackagetool6 --type Plasma/Applet --upgrade cachyos-drive-card-0.95.0-beta1.plasmoid
+kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-0.95.0-beta2.plasmoid
 ```
 
-При первой установке используйте `--install`. Затем добавьте «Карточка дисков» из списка виджетов Plasma.
-
-## Из исходников
+### Option 2 — One command (latest stable release)
 
 ```bash
-git clone https://github.com/aliksandrkarankevich-sudo/cachyos-drive-card.git
-cd cachyos-drive-card
-./scripts/install.sh
+curl -fsSL https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh -o install-drive-cards.sh
+less install-drive-cards.sh   # inspect before running
+bash install-drive-cards.sh
 ```
 
-## Сборка и проверка
+Install the latest beta instead:
 
 ```bash
-./scripts/check.sh
-./scripts/build.sh
+bash install-drive-cards.sh --prerelease
 ```
 
-Готовый пакет появится в `dist/`.
-
-## Сообщение об ошибке
-
-Используйте форму **Bug report** в Issues. Приложите версию Plasma, способ установки, шаги воспроизведения, снимок экрана и вывод:
+### Option 3 — From a Git clone (for testing or development)
 
 ```bash
-journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
+git clone --depth 1 https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+cd AI-PlasmaDriveCard
+bash scripts/install.sh
 ```
 
-## Статус
+To test a specific branch (e.g. beta2):
 
-0.95.0-beta1 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
+```bash
+git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
+  https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+cd AI-PlasmaDriveCard
+bash scripts/install.sh
+```
 
-## Лицензия
+## Updating
 
-GPL-3.0-or-later.
+```bash
+kpackagetool6 --type Plasma/Applet --upgrade cachyos-drive-card-<version>.plasmoid
+```
+
+Or re-run `install-from-github.sh` — it detects an existing installation automatically.
+
+## Uninstalling
+
+```bash
+bash scripts/uninstall.sh
+# or directly:
+kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
+```
+
+## Features
+
+- Mounted local filesystems displayed as compact cards
+- Colour-coded usage bar (normal / warning / critical thresholds)
+- Disk activity indicator per drive
+- Four-sided configurable edge-fade background
+- Light / dark theme colours or custom colour picker
+- Configurable icon style: drive, folder, or open-folder
+- Click anywhere on a drive row to open it in the file manager
+- Russian and English interface
+
+## Requirements
+
+- KDE Plasma ≥ 6.0
+- `findmnt`, `lsblk`, `udevadm` (standard on any Linux system)
+- `kpackagetool6` for terminal installation
+
+## Reporting Issues
+
+Please include the widget version (visible in widget settings) when opening an issue.
+
+## License
+
+GPL-3.0-or-later — see [LICENSE](LICENSE).

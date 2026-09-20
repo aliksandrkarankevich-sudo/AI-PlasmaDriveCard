@@ -20,7 +20,6 @@ QQC2.ScrollView {
     property bool cfg_showFs
     property bool cfg_showPhysical
     property string cfg_iconStyle
-    property bool cfg_openOnRowClick
     property bool cfg_showActivity
     property int cfg_activityInterval
     property int cfg_backgroundOpacity
@@ -119,12 +118,6 @@ QQC2.ScrollView {
             model: [page.tr2("Диск", "Drive"), page.tr2("Папка", "Folder"), page.tr2("Открытая папка", "Open folder")]
             currentIndex: page.cfg_iconStyle === "folder" ? 1 : (page.cfg_iconStyle === "folder-open" ? 2 : 0)
             onActivated: page.cfg_iconStyle = currentIndex === 1 ? "folder" : (currentIndex === 2 ? "folder-open" : "drive")
-        }
-        QQC2.CheckBox {
-            Kirigami.FormData.label: page.tr2("Открытие:", "Opening:")
-            text: page.tr2("Открывать нажатием по строке", "Open by clicking the row")
-            checked: page.cfg_openOnRowClick
-            onToggled: page.cfg_openOnRowClick = checked
         }
         QQC2.CheckBox {
             Kirigami.FormData.label: page.tr2("Активность:", "Activity:")
@@ -246,4 +239,3 @@ QQC2.ScrollView {
         Item { Kirigami.FormData.isSection: true; implicitHeight: 32 }
     }
 }
-

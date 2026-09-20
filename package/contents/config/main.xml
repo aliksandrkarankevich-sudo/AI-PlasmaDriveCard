@@ -12,7 +12,6 @@
 <entry name="showFs" type="Bool"><default>true</default></entry>
 <entry name="showPhysical" type="Bool"><default>true</default></entry>
 <entry name="iconStyle" type="String"><default>drive</default></entry>
-<entry name="openOnRowClick" type="Bool"><default>true</default></entry>
 <entry name="showActivity" type="Bool"><default>true</default></entry>
 <entry name="activityInterval" type="Int"><default>2</default></entry>
 <entry name="backgroundOpacity" type="Int"><default>40</default></entry>
@@ -31,4 +30,3 @@
 <entry name="warningPercent" type="Int"><default>80</default></entry>
 <entry name="criticalPercent" type="Int"><default>90</default></entry>
 </group></kcfg>
-

@@ -1,7 +1,7 @@
 name: Check
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/**', 'feat/**']
   pull_request:
     branches: [main]
 permissions:
@@ -15,9 +15,14 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y zip
       - name: Check and build
         run: ./scripts/check.sh
+      - name: Get version
+        id: version
+        run: |
+          VER=$(python3 -c "import json; print(json.load(open('package/metadata.json'))['KPlugin']['Version'])")
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: drive-cards-0.95b1
+          name: drive-cards-${{ steps.version.outputs.ver }}
           path: |
             dist/*.plasmoid
             dist/SHA256SUMS

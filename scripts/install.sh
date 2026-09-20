@@ -1,11 +1,25 @@
 #!/usr/bin/env bash
+# install.sh — build and install Drive Cards from a local Git clone
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-id=io.github.cachyos.drivecard
-command -v kpackagetool6 >/dev/null || { echo "Нет kpackagetool6. Установите пакет kpackage." >&2; exit 1; }
-if kpackagetool6 --type Plasma/Applet --show "$id" >/dev/null 2>&1; then
-  kpackagetool6 --type Plasma/Applet --upgrade package
-else
-  kpackagetool6 --type Plasma/Applet --install package
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+if ! command -v kpackagetool6 &>/dev/null; then
+    echo "ERROR: kpackagetool6 not found."
+    exit 1
 fi
-echo "Drive Cards установлен. Добавьте виджет через интерфейс Plasma."
+
+bash "${ROOT}/scripts/build.sh"
+
+VERSION=$(python3 -c "import json; print(json.load(open('${ROOT}/package/metadata.json'))['KPlugin']['Version'])")
+FILE="${ROOT}/dist/cachyos-drive-card-${VERSION}.plasmoid"
+
+if kpackagetool6 --type Plasma/Applet --list 2>/dev/null | grep -q "io.github.cachyos.drivecard"; then
+    echo "Upgrading existing installation..."
+    kpackagetool6 --type Plasma/Applet --upgrade "${FILE}"
+else
+    echo "Installing Drive Cards..."
+    kpackagetool6 --type Plasma/Applet --install "${FILE}"
+fi
+
+echo "Done! Drive Cards ${VERSION} installed."

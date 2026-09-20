@@ -5,12 +5,12 @@ labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: Спасибо за проверку beta-версии. Заполните сведения ниже.
+      value: Спасибо за проверку beta-версии. Перед публикацией удалите персональные данные.
   - type: input
     id: version
     attributes:
       label: Версия Drive Cards
-      placeholder: 0.95.0-beta1
+      placeholder: 0.95.0-beta2
     validations:
       required: true
   - type: input
@@ -43,7 +43,7 @@ body:
     id: logs
     attributes:
       label: Журнал и снимки экрана
-      description: Удалите персональные данные перед публикацией.
+      description: Добавьте скриншот или видео для визуальной ошибки. Для загрузки используйте `journalctl --user -b | grep -Ei 'plasmashell|drivecard|qml'`. Удалите имена пользователей, домашние пути, UUID и другие персональные данные.
       render: shell
   - type: checkboxes
     id: checks
@@ -52,5 +52,5 @@ body:
       options:
         - label: Я проверил существующие Issues.
           required: true
-        - label: Я удалил персональные данные из журнала.
+        - label: Я удалил персональные данные из журнала и снимков экрана.
           required: true

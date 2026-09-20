@@ -1,18 +1,26 @@
 #!/usr/bin/env bash
+# build.sh — package Drive Cards into a .plasmoid archive
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-version="$(python3 -c "import json; print(json.load(open('package/metadata.json'))['KPlugin']['Version'])")"
-out="dist/cachyos-drive-card-${version}.plasmoid"
-mkdir -p dist
-rm -f "$out" dist/SHA256SUMS
-python3 - "$out" <<'PY'
-from pathlib import Path
-from zipfile import ZipFile, ZIP_DEFLATED
-import sys
-root=Path('package')
-with ZipFile(sys.argv[1], 'w', ZIP_DEFLATED) as z:
-    for p in sorted(root.rglob('*')):
-        if p.is_file(): z.write(p, p.relative_to(root))
-PY
-(cd dist && sha256sum "$(basename "$out")" > SHA256SUMS)
-echo "Создан $out"
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VERSION=$(python3 -c "import json; print(json.load(open('${ROOT}/package/metadata.json'))['KPlugin']['Version'])")
+OUT="${ROOT}/dist/cachyos-drive-card-${VERSION}.plasmoid"
+
+mkdir -p "${ROOT}/dist"
+
+# Remove old artefacts for this version
+rm -f "${OUT}"
+
+cd "${ROOT}/package"
+
+# Exclude backup files, editor swap files, and macOS metadata
+zip -r "${OUT}" . \
+    --exclude '*.backup*' \
+    --exclude '*.bak' \
+    --exclude '*.orig' \
+    --exclude '*~' \
+    --exclude '*.swp' \
+    --exclude '__MACOSX/*' \
+    --exclude '.DS_Store'
+
+echo "Built: ${OUT}"
