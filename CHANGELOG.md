@@ -4,8 +4,28 @@
 
 ### Planned
 
-- Исправления по итогам тестирования beta1.
-- Проверка поведения на разных масштабах Plasma.
+- Исправления по итогам тестирования beta2.
+- Проверка поведения на разных масштабах Plasma и темах оформления.
+
+## [0.95.0-beta2] — 2026-09-20
+
+### Added
+
+- Четырёхсторонний переход фона в прозрачность.
+- Подсветка строки раздела при наведении и нажатии.
+- Открытие раздела всей строкой с поддержкой клавиатуры.
+- Отдельное руководство по отправке отчёта об ошибке в README.
+
+### Changed
+
+- Фон теперь рисуется один раз, без суммирования прозрачности перекрывающихся прямоугольников.
+- Ширина и кривая перехода одинаково применяются слева, справа, сверху и снизу.
+- Версия пакета обновлена до `0.95.0-beta2`.
+
+### Removed
+
+- Отдельная кнопка открытия раздела.
+- Устаревшая настройка «Открывать нажатием по строке».
 
 ## [0.95.0-beta1] — 2026-09-19
 
@@ -23,5 +43,6 @@
 - Переработан расчёт автоматической высоты.
 - Восстановлено полное представление Plasma.
 
-[Unreleased]: https://github.com/aliksandrkarankevich-sudo/cachyos-drive-card/compare/v0.95.0-beta1...HEAD
-[0.95.0-beta1]: https://github.com/aliksandrkarankevich-sudo/cachyos-drive-card/releases/tag/v0.95.0-beta1
+[Unreleased]: https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/compare/v0.95.0-beta2...HEAD
+[0.95.0-beta2]: https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/compare/v0.95.0-beta1...v0.95.0-beta2
+[0.95.0-beta1]: https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases/tag/v0.95.0-beta1

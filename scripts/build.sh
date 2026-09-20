@@ -10,9 +10,15 @@ from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 import sys
 root=Path('package')
+skip_suffixes={'.bak','.backup','.orig','.rej','.tmp','~'}
 with ZipFile(sys.argv[1], 'w', ZIP_DEFLATED) as z:
     for p in sorted(root.rglob('*')):
-        if p.is_file(): z.write(p, p.relative_to(root))
+        if not p.is_file():
+            continue
+        lower=p.name.lower()
+        if lower.endswith(tuple(skip_suffixes)) or '.backup-' in lower:
+            continue
+        z.write(p, p.relative_to(root))
 PY
 (cd dist && sha256sum "$(basename "$out")" > SHA256SUMS)
 echo "Создан $out"
