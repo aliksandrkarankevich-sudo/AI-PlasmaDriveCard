@@ -1,0 +1,56 @@
+name: Bug report
+description: Сообщить об ошибке Drive Cards
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Спасибо за проверку beta-версии. Заполните сведения ниже.
+  - type: input
+    id: version
+    attributes:
+      label: Версия Drive Cards
+      placeholder: 0.95.0-beta1
+    validations:
+      required: true
+  - type: input
+    id: plasma
+    attributes:
+      label: Система и Plasma
+      placeholder: CachyOS, Plasma 6.x, Wayland
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактическое поведение
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Журнал и снимки экрана
+      description: Удалите персональные данные перед публикацией.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверки
+      options:
+        - label: Я проверил существующие Issues.
+          required: true
+        - label: Я удалил персональные данные из журнала.
+          required: true

@@ -1,0 +1,6 @@
+dist/*
+!dist/.gitkeep
+*.plasmoid
+*.zip
+.DS_Store
+*~

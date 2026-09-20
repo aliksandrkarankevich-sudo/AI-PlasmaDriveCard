@@ -1,0 +1,23 @@
+name: Check
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install zip support
+        run: sudo apt-get update && sudo apt-get install -y zip
+      - name: Check and build
+        run: ./scripts/check.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: drive-cards-0.95b1
+          path: |
+            dist/*.plasmoid
+            dist/SHA256SUMS
