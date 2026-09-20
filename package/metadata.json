@@ -13,7 +13,7 @@
     "License": "GPL-3.0-or-later",
     "Name": "Drive Cards",
     "Name[ru]": "Карточка дисков",
-    "Version": "0.95.0-beta1"
+    "Version": "0.95.0-beta2"
   },
   "KPackageStructure": "Plasma/Applet",
   "X-Plasma-API-Minimum-Version": "6.0"
