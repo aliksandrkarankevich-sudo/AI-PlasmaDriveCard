@@ -10,8 +10,9 @@ missing=[str(p) for p in required if not p.is_file()]
 assert not missing, f'Missing files: {missing}'
 meta=json.loads(required[0].read_text())
 assert meta['KPlugin']['Id']=='io.github.cachyos.drivecard'
-assert meta['KPlugin']['Version']=='0.95.0-beta1'
 assert meta['KPackageStructure']=='Plasma/Applet'
+version=meta['KPlugin']['Version']
+print(f'Version from metadata: {version}')
 ET.parse(required[2])
 cfg=required[3].read_text(); xml=required[2].read_text()
 props=set(re.findall(r'property\s+\w+\s+cfg_(\w+)',cfg))
@@ -23,12 +24,15 @@ bash -n scripts/*.sh
 ./scripts/build.sh
 python3 - <<'PY'
 from zipfile import ZipFile
-p='dist/cachyos-drive-card-0.95.0-beta1.plasmoid'
+import json
+from pathlib import Path
+version=json.loads(Path('package/metadata.json').read_text())['KPlugin']['Version']
+p=f'dist/cachyos-drive-card-{version}.plasmoid'
 with ZipFile(p) as z:
     assert z.testzip() is None
     names=set(z.namelist())
     assert {'metadata.json','contents/ui/main.qml','contents/config/main.xml'} <= names
-print('Plasmoid archive: OK')
+print(f'Plasmoid archive {p}: OK')
 PY
 if command -v qmllint >/dev/null 2>&1; then
   qmllint package/contents/ui/main.qml package/contents/ui/ConfigGeneral.qml package/contents/config/config.qml
