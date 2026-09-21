@@ -1,32 +1,38 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0 http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
-<kcfgfile name=""/><group name="General">
-<entry name="language" type="String"><default>ru</default></entry>
-<entry name="autoFit" type="Bool"><default>true</default></entry>
-<entry name="rowHeight" type="Int"><default>112</default></entry>
-<entry name="textScale" type="Int"><default>100</default></entry>
-<entry name="progressHeight" type="Int"><default>8</default></entry>
-<entry name="maxHeight" type="Int"><default>720</default></entry>
-<entry name="showRoot" type="Bool"><default>true</default></entry>
-<entry name="showBoot" type="Bool"><default>false</default></entry>
-<entry name="showFs" type="Bool"><default>true</default></entry>
-<entry name="showPhysical" type="Bool"><default>true</default></entry>
-<entry name="iconStyle" type="String"><default>drive</default></entry>
-<entry name="showActivity" type="Bool"><default>true</default></entry>
-<entry name="activityInterval" type="Int"><default>2</default></entry>
-<entry name="backgroundOpacity" type="Int"><default>40</default></entry>
-<entry name="backgroundColorMode" type="String"><default>theme</default></entry>
-<entry name="backgroundColor" type="String"><default>#20242b</default></entry>
-<entry name="textOpacity" type="Int"><default>90</default></entry>
-<entry name="textColorMode" type="String"><default>theme</default></entry>
-<entry name="textColor" type="String"><default>#eff0f1</default></entry>
-<entry name="rounded" type="Bool"><default>true</default></entry>
-<entry name="cornerRadius" type="Int"><default>15</default></entry>
-<entry name="edgeOpacity" type="Int"><default>100</default></entry>
-<entry name="edgeWidth" type="Int"><default>30</default></entry>
-<entry name="edgeCurve" type="Int"><default>0</default></entry>
-<entry name="contentPadding" type="Int"><default>24</default></entry>
-<entry name="updateInterval" type="Int"><default>60</default></entry>
-<entry name="warningPercent" type="Int"><default>80</default></entry>
-<entry name="criticalPercent" type="Int"><default>90</default></entry>
-</group></kcfg>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+                          http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile name=""/>
+  <group name="General">
+    <entry name="language"           type="String"><default>ru</default></entry>
+    <entry name="autoFit"            type="Bool">  <default>true</default></entry>
+    <entry name="rowHeight"          type="Int">   <default>112</default></entry>
+    <entry name="textScale"          type="Int">   <default>100</default></entry>
+    <entry name="progressHeight"     type="Int">   <default>8</default></entry>
+    <entry name="maxHeight"          type="Int">   <default>720</default></entry>
+    <entry name="showRoot"           type="Bool">  <default>true</default></entry>
+    <entry name="showBoot"           type="Bool">  <default>false</default></entry>
+    <entry name="showFs"             type="Bool">  <default>true</default></entry>
+    <entry name="showPhysical"       type="Bool">  <default>true</default></entry>
+    <entry name="iconStyle"          type="String"><default>drive</default></entry>
+    <!-- openOnRowClick removed in 0.95.0-beta2: clicking the row always opens the drive -->
+    <entry name="showActivity"       type="Bool">  <default>true</default></entry>
+    <entry name="activityInterval"   type="Int">   <default>2</default></entry>
+    <entry name="backgroundOpacity"  type="Int">   <default>40</default></entry>
+    <entry name="backgroundColorMode" type="String"><default>theme</default></entry>
+    <entry name="backgroundColor"    type="String"><default>#20242b</default></entry>
+    <entry name="textOpacity"        type="Int">   <default>90</default></entry>
+    <entry name="textColorMode"      type="String"><default>theme</default></entry>
+    <entry name="textColor"          type="String"><default>#eff0f1</default></entry>
+    <entry name="rounded"            type="Bool">  <default>true</default></entry>
+    <entry name="cornerRadius"       type="Int">   <default>15</default></entry>
+    <entry name="edgeOpacity"        type="Int">   <default>100</default></entry>
+    <entry name="edgeWidth"          type="Int">   <default>30</default></entry>
+    <entry name="edgeCurve"          type="Int">   <default>0</default></entry>
+    <entry name="contentPadding"     type="Int">   <default>24</default></entry>
+    <entry name="updateInterval"     type="Int">   <default>60</default></entry>
+    <entry name="warningPercent"     type="Int">   <default>80</default></entry>
+    <entry name="criticalPercent"    type="Int">   <default>90</default></entry>
+  </group>
+</kcfg>
