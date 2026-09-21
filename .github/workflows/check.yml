@@ -12,7 +12,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install zip support
-        run: sudo apt-get update && sudo apt-get install -y zip
+        run: sudo apt-get update && sudo apt-get install -y zip python3
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
       - name: Check and build
         run: ./scripts/check.sh
       - name: Get version
