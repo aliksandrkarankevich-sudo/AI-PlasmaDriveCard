@@ -10,6 +10,9 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
+    // Remove default Plasma background — we draw our own
+    Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
+
     readonly property bool ru: Plasmoid.configuration.language !== "en"
     readonly property int pad: Plasmoid.configuration.contentPadding
     readonly property int rowH: Plasmoid.configuration.rowHeight
@@ -363,7 +366,6 @@ PlasmoidItem {
                                 text: used + "% " + root.tr2("занято", "used")
                                 color: view.labelColor; font.pixelSize: root.fontPx(13)
                             }
-                            // ProgressBar wrapped in Item to enforce height
                             Item {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: Math.max(4, Plasmoid.configuration.progressHeight)
