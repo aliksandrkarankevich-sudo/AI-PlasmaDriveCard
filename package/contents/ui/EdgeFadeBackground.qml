@@ -1,83 +1,79 @@
 // EdgeFadeBackground.qml
-// Four-sided edge fade: solid centre Rectangle + four LinearGradient strips.
-// Gamma-corrected midpoint stop for perceptually smooth transition.
+// Single-pass ShaderEffect background:
+//   - no Qt5Compat dependency
+//   - no corner overlap / darkening
+//   - perceptually smooth fade via smoothstep + pow curve
 import QtQuick
-import Qt5Compat.GraphicalEffects
 
 Item {
     id: root
 
     property color baseColor:   "black"
-    property real  centerAlpha: 0.4
-    property real  edgeAlpha:   1.0   // 0 = same as centre, 1 = fully transparent edge
-    property real  fadeWidth:   30
-    property real  curve:       0.0   // reserved
+    property real  centerAlpha: 0.4   // alpha at centre (0..1)
+    property real  edgeAlpha:   1.0   // fade strength: 0=no fade, 1=fully transparent edge
+    property real  fadeWidth:   30    // px — fade band width
+    property real  curve:       0.0   // 0=smoothstep, >0=steeper, <0=softer  (maps to pow exponent)
     property real  radius:      0
 
-    readonly property real  _ea:          Math.max(0.0, Math.min(1.0, edgeAlpha))
-    readonly property real  _edgeFinal:   centerAlpha * (1.0 - _ea)
-    readonly property real  _midAlpha:    _edgeFinal + Math.sqrt((_ea)) * (centerAlpha - _edgeFinal) * 0.5
-    readonly property color _centerColor: Qt.rgba(baseColor.r, baseColor.g, baseColor.b, centerAlpha)
-    readonly property color _midColor:    Qt.rgba(baseColor.r, baseColor.g, baseColor.b, _midAlpha)
-    readonly property color _edgeColor:   Qt.rgba(baseColor.r, baseColor.g, baseColor.b, _edgeFinal)
-    readonly property real  _fw:          Math.max(0, Math.min(fadeWidth, Math.min(width, height) / 2))
+    // Normalised fade width (0..0.5) passed to shader
+    readonly property real _fwNorm: (width > 0 && height > 0)
+        ? Math.max(0.0, Math.min(0.45, fadeWidth / Math.min(width, height)))
+        : 0.0
+    readonly property real _ea: Math.max(0.0, Math.min(1.0, edgeAlpha))
+    // pow exponent: curve==0 → exp=2 (smooth), curve==1 → exp=4 (sharp), curve==-1 → exp=1 (linear)
+    readonly property real _exp: Math.max(0.5, 2.0 + curve * 2.0)
 
-    // Solid base at centre alpha
+    // Clip to rounded rectangle so shader corners are clean
     Rectangle {
+        id: clipRect
         anchors.fill: parent
         radius: root.radius
-        color: root._centerColor
-    }
+        color: "transparent"
+        clip: true
 
-    // Left: edge -> mid -> centre
-    LinearGradient {
-        visible: root._fw > 0 && root._ea > 0.005
-        width: root._fw; height: parent.height
-        anchors.left: parent.left
-        start: Qt.point(0, 0); end: Qt.point(width, 0)
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: root._edgeColor }
-            GradientStop { position: 0.5; color: root._midColor }
-            GradientStop { position: 1.0; color: root._centerColor }
-        }
-    }
+        ShaderEffect {
+            anchors.fill: parent
 
-    // Right: centre -> mid -> edge
-    LinearGradient {
-        visible: root._fw > 0 && root._ea > 0.005
-        width: root._fw; height: parent.height
-        anchors.right: parent.right
-        start: Qt.point(0, 0); end: Qt.point(width, 0)
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: root._centerColor }
-            GradientStop { position: 0.5; color: root._midColor }
-            GradientStop { position: 1.0; color: root._edgeColor }
-        }
-    }
+            // uniforms
+            property vector3d baseRGB: Qt.vector3d(root.baseColor.r, root.baseColor.g, root.baseColor.b)
+            property real centerAlpha: root.centerAlpha
+            property real edgeStrength: root._ea
+            property real fw: root._fwNorm
+            property real exp_: root._exp
 
-    // Top: edge -> mid -> centre
-    LinearGradient {
-        visible: root._fw > 0 && root._ea > 0.005
-        width: parent.width; height: root._fw
-        anchors.top: parent.top
-        start: Qt.point(0, 0); end: Qt.point(0, height)
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: root._edgeColor }
-            GradientStop { position: 0.5; color: root._midColor }
-            GradientStop { position: 1.0; color: root._centerColor }
-        }
-    }
+            fragmentShader: "
+                #version 440
+                layout(location = 0) in vec2 qt_TexCoord0;
+                layout(location = 0) out vec4 fragColor;
 
-    // Bottom: centre -> mid -> edge
-    LinearGradient {
-        visible: root._fw > 0 && root._ea > 0.005
-        width: parent.width; height: root._fw
-        anchors.bottom: parent.bottom
-        start: Qt.point(0, 0); end: Qt.point(0, height)
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: root._centerColor }
-            GradientStop { position: 0.5; color: root._midColor }
-            GradientStop { position: 1.0; color: root._edgeColor }
+                layout(std140, binding = 0) uniform buf {
+                    mat4 qt_Matrix;
+                    float qt_Opacity;
+                    vec3  baseRGB;
+                    float centerAlpha;
+                    float edgeStrength;
+                    float fw;
+                    float exp_;
+                };
+
+                void main() {
+                    vec2 uv = qt_TexCoord0;               // 0..1
+                    // distance from each edge, normalised 0..1 within fade band
+                    float dx = min(uv.x, 1.0 - uv.x);   // dist to left/right edge
+                    float dy = min(uv.y, 1.0 - uv.y);   // dist to top/bottom edge
+                    // t=0 at edge, t=1 inside fade band
+                    float tx = (fw > 0.0) ? clamp(dx / fw, 0.0, 1.0) : 1.0;
+                    float ty = (fw > 0.0) ? clamp(dy / fw, 0.0, 1.0) : 1.0;
+                    float t  = min(tx, ty);              // corner = min of both axes — no overlap
+                    // smooth curve
+                    float s  = smoothstep(0.0, 1.0, t);
+                    s        = pow(s, exp_);
+                    // alpha: edge is centerAlpha*(1-edgeStrength), centre is centerAlpha
+                    float edgeAlpha = centerAlpha * (1.0 - edgeStrength);
+                    float alpha = mix(edgeAlpha, centerAlpha, s) * qt_Opacity;
+                    fragColor = vec4(baseRGB * alpha, alpha);
+                }
+            "
         }
     }
 }

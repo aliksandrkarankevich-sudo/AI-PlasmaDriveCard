@@ -10,7 +10,6 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
-    // Remove default Plasma background — we draw our own
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
     readonly property bool ru: Plasmoid.configuration.language !== "en"
@@ -170,11 +169,14 @@ PlasmoidItem {
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
-    Layout.minimumWidth: 360
+    // autoFit: explicit height forces Plasma Desktop to actually resize the widget
+    width:  470
+    height: Plasmoid.configuration.autoFit ? wantedHeight : Math.max(220, implicitHeight)
+    Layout.minimumWidth:   360
     Layout.preferredWidth: 470
-    Layout.minimumHeight: Plasmoid.configuration.autoFit ? wantedHeight : 220
+    Layout.minimumHeight:  Plasmoid.configuration.autoFit ? wantedHeight : 220
     Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : 420
-    Layout.maximumHeight: Plasmoid.configuration.autoFit ? wantedHeight : 16777215
+    Layout.maximumHeight:  Plasmoid.configuration.autoFit ? wantedHeight : 16777215
 
     ListModel { id: drives }
 
@@ -218,13 +220,15 @@ PlasmoidItem {
 
     fullRepresentation: Item {
         id: view
-        implicitWidth: 470
+        implicitWidth:  470
         implicitHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 420
-        Layout.minimumWidth: 360
+        // explicit height mirrors PlasmoidItem so the container follows
+        height: Plasmoid.configuration.autoFit ? root.wantedHeight : Math.max(220, implicitHeight)
+        Layout.minimumWidth:   360
         Layout.preferredWidth: 470
-        Layout.minimumHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 220
+        Layout.minimumHeight:  Plasmoid.configuration.autoFit ? root.wantedHeight : 220
         Layout.preferredHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 420
-        Layout.maximumHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 16777215
+        Layout.maximumHeight:  Plasmoid.configuration.autoFit ? root.wantedHeight : 16777215
 
         readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
             ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
