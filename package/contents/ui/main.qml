@@ -155,6 +155,13 @@ PlasmoidItem {
         }
         previousIo = current
     }
+    // Update icon for all rows when iconStyle changes without waiting for next scan
+    function refreshIcons() {
+        for (var i = 0; i < drives.count; ++i) {
+            var row = drives.get(i)
+            drives.setProperty(i, "driveIcon", displayIcon(row.target, row.physical))
+        }
+    }
 
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript: "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
@@ -187,14 +194,15 @@ PlasmoidItem {
         }
     }
 
-    // Main poll timer — runs findmnt + lsblk on schedule
+    // Main scan timer — no triggeredOnStart, first scan via Component.onCompleted
     Timer {
+        id: mainTimer
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
-        repeat: true; running: true; triggeredOnStart: true
+        repeat: true; running: true
         onTriggered: root.refresh(0)
     }
 
-    // Activity poll timer — reads /proc/diskstats
+    // Activity poll timer
     Timer {
         interval: Math.max(1, Plasmoid.configuration.activityInterval) * 1000
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
@@ -207,23 +215,32 @@ PlasmoidItem {
         id: fitTimer; interval: 150; repeat: false
         onTriggered: {
             if (!Plasmoid.configuration.autoFit) return
-            root.Layout.minimumHeight = root.wantedHeight
-            root.Layout.preferredHeight = root.wantedHeight
-            root.Layout.maximumHeight = root.wantedHeight
-            root.height = root.wantedHeight
+            var h = root.wantedHeight
+            root.Layout.minimumHeight = h
+            root.Layout.preferredHeight = h
+            root.Layout.maximumHeight = h
+            root.height = h
+            // also update fullRepresentation layout
+            if (view) {
+                view.Layout.minimumHeight = h
+                view.Layout.preferredHeight = h
+                view.Layout.maximumHeight = h
+                view.implicitHeight = h
+            }
         }
     }
 
     Connections {
         target: Plasmoid.configuration
-        function onShowRootChanged() { root.refresh(0) }
-        function onShowBootChanged() { root.refresh(0) }
-        function onRowHeightChanged() { fitTimer.restart() }
-        function onMaxHeightChanged() { fitTimer.restart() }
-        function onAutoFitChanged()   { fitTimer.restart() }
+        function onShowRootChanged()    { root.refresh(0) }
+        function onShowBootChanged()    { root.refresh(0) }
+        function onIconStyleChanged()   { root.refreshIcons() }
+        function onRowHeightChanged()   { fitTimer.restart() }
+        function onMaxHeightChanged()   { fitTimer.restart() }
+        function onAutoFitChanged()     { fitTimer.restart() }
     }
 
-    Component.onCompleted: root.refresh(0)
+    Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
     fullRepresentation: Item {
         id: view
@@ -257,6 +274,7 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing: 4
 
+            // Header
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
@@ -276,6 +294,7 @@ PlasmoidItem {
                 }
             }
 
+            // Drive list
             ListView {
                 id: list
                 Layout.fillWidth: true
@@ -332,6 +351,7 @@ PlasmoidItem {
                         anchors.rightMargin: 8
                         spacing: 14
 
+                        // Drive icon + activity dot
                         Item {
                             Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
@@ -345,16 +365,19 @@ PlasmoidItem {
                             }
                         }
 
+                        // Labels + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
-                            spacing: 4
+                            spacing: 2
 
+                            // Drive name
                             PC3.Label {
                                 text: title; color: view.labelColor
                                 font.bold: true; font.pixelSize: root.fontPx(18)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
+                            // Free / total
                             PC3.Label {
                                 text: root.formatBytes(available) + " "
                                     + root.tr2("свободно из", "free of") + " "
@@ -362,11 +385,12 @@ PlasmoidItem {
                                 color: view.labelColor; font.pixelSize: root.fontPx(16)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
+                            // FS / physical drive
                             PC3.Label {
                                 visible: Plasmoid.configuration.showFs
                                     || Plasmoid.configuration.showPhysical
                                 text: {
-                                    var a = Plasmoid.configuration.showFs      ? fs       : ""
+                                    var a = Plasmoid.configuration.showFs       ? fs       : ""
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
                                     return (a && b) ? (a + "  •  " + b) : (a + b)
                                 }
@@ -374,6 +398,13 @@ PlasmoidItem {
                                 font.pixelSize: root.fontPx(13)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
+                            // % used — now ABOVE the progress bar
+                            PC3.Label {
+                                Layout.alignment: Qt.AlignRight
+                                text: used + "% " + root.tr2("занято", "used")
+                                color: view.labelColor; font.pixelSize: root.fontPx(13)
+                            }
+                            // Progress bar
                             QQC2.ProgressBar {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: Plasmoid.configuration.progressHeight
@@ -385,23 +416,18 @@ PlasmoidItem {
                                             ? Kirigami.Theme.neutralTextColor
                                             : Kirigami.Theme.highlightColor
                             }
-                            PC3.Label {
-                                Layout.alignment: Qt.AlignRight
-                                text: used + "% " + root.tr2("занято", "used")
-                                color: view.labelColor; font.pixelSize: root.fontPx(13)
-                            }
                         }
                     }
                 }
 
+                // Empty state
                 PC3.Label {
                     anchors.centerIn: parent
                     visible: drives.count === 0
                     text: root.scanRunning
                         ? root.tr2("Обновление...", "Refreshing...")
                         : root.tr2("Доступные диски не найдены", "No accessible drives found")
-                    color: view.labelColor
-                    opacity: 0.75
+                    color: view.labelColor; opacity: 0.75
                     font.pixelSize: root.fontPx(15)
                 }
             }
