@@ -13,11 +13,10 @@ English: a compact configurable drive-card widget for KDE Plasma 6.
 - Русский и английский интерфейс.
 - Автоматическая высота при изменении числа разделов.
 - Открытие раздела нажатием по всей строке.
-- Четырёхсторонний плавный переход фона в прозрачность.
 - Значки диска, папки и открытой папки.
 - Масштаб текста и толщина индикатора заполнения.
 - Цвета и прозрачность фона и текста.
-- Настраиваемые скругления и прозрачные края.
+- Настраиваемые скругления и **четырёхсторонный переход в прозрачность** по краям.
 - Индикатор операций чтения/записи.
 - Автообновление после подключения и отключения накопителя.
 
@@ -34,12 +33,6 @@ bash install-from-github.sh
 
 > Рекомендуется сначала просмотреть скрипт: `less install-from-github.sh`
 
-Для установки beta-версии:
-
-```bash
-bash install-from-github.sh --prerelease
-```
-
 ### Способ 2 — Вручную из Releases
 
 1. Перейдите на страницу [Releases](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases).
@@ -52,7 +45,7 @@ kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
 
 При обновлении замените `--install` на `--upgrade`.
 
-Либо откройте файл через Plasma: правая кнопка на рабочем столе → **Добавить виджеты** → **Установить виджет из локального файла**.
+Либо откройте через Plasma: правая кнопка на рабочем столе → **Добавить виджеты** → **Установить виджет из локального файла**.
 
 ### Способ 3 — Из исходников (для разработки и тестирования)
 
@@ -62,21 +55,13 @@ cd AI-PlasmaDriveCard
 ./scripts/install.sh
 ```
 
-Для конкретной ветки или тега:
+Для beta-ветки:
 
 ```bash
 git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
   https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
 ./scripts/install.sh
-```
-
-## Обновление
-
-Через скрипт — достаточно запустить его снова. Вручную:
-
-```bash
-kpackagetool6 --type Plasma/Applet --upgrade cachyos-drive-card-*.plasmoid
 ```
 
 ## Удаление
@@ -102,7 +87,7 @@ kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 
 ## Сообщение об ошибке
 
-Используйте форму **Bug report** в [Issues](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues). Приложите версию Plasma, способ установки, шаги воспроизведения, снимок экрана и вывод:
+Используйте форму **Bug report** в Issues. Приложите версию Plasma, способ установки, шаги воспроизведения, снимок экрана и вывод:
 
 ```bash
 journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"

@@ -26,7 +26,7 @@ PlasmoidItem {
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
-        var url = target.endsWith("/") ? target : (target + "/")
+        var url = target.endsWith("/") ? target : target + "/"
         Qt.openUrlExternally("file://" + encodeURI(url))
     }
     function displayIcon(target, physical) {
@@ -49,7 +49,7 @@ PlasmoidItem {
     }
     function formatBytes(number) {
         var n = Number(number) || 0
-        var units = ru ? ["Б", "КиБ", "МиБ", "ГиБ", "ТиБ"] : ["B", "KiB", "MiB", "GiB", "TiB"]
+        var units = ru ? ["\u0411", "\u041a\u0438\u0411", "\u041c\u0438\u0411", "\u0413\u0438\u0411", "\u0422\u0438\u0411"] : ["B", "KiB", "MiB", "GiB", "TiB"]
         var i = 0
         while (n >= 1024 && i < units.length - 1) { n /= 1024; ++i }
         return Qt.locale(ru ? "ru_RU" : "en_US").toString(n, "f", i < 3 ? 0 : 1) + " " + units[i]
@@ -67,7 +67,7 @@ PlasmoidItem {
         if (match) return "NVMe " + match[1]
         if (tran === "usb") return "USB " + name
         if (tran === "sata" || /^sd[a-z]+$/.test(name)) return "SATA " + name
-        return tran ? tran.toUpperCase() + " " + name : tr2("Диск ", "Disk ") + name
+        return tran ? tran.toUpperCase() + " " + name : tr2("\u0414\u0438\u0441\u043a ", "Disk ") + name
     }
     function flatten(items, output) {
         for (var i = 0; i < (items || []).length; ++i) {
@@ -113,7 +113,7 @@ PlasmoidItem {
             var available = Number(fs.avail) || 0
             var used = parseInt(String(fs["use%"] || "0")) || 0
             var label = fs.label || ""
-            if (target === "/") label = tr2("Система", "System")
+            if (target === "/") label = tr2("\u0421\u0438\u0441\u0442\u0435\u043c\u0430", "System")
             else if (!label) label = basename(target)
             var physical = shortDrive(source, map)
             rows.push({
@@ -261,123 +261,28 @@ PlasmoidItem {
             ? Plasmoid.configuration.textColor : Kirigami.Theme.textColor
         readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
-        readonly property real baseAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
-        readonly property real edgeAlpha: Plasmoid.configuration.edgeOpacity / 100.0
-        readonly property real edgeFraction: Plasmoid.configuration.edgeWidth <= 0
-            ? 0.0
-            : Math.min(0.48, Plasmoid.configuration.edgeWidth / Math.max(1, Math.min(width, height)))
-        readonly property real curvePow: {
-            var c = Plasmoid.configuration.edgeCurve
-            if (c === 0) return 1.0
-            return c > 0 ? (1.0 + c / 50.0) : (1.0 / (1.0 - c / 50.0))
-        }
 
-        // Compute alpha at a given fractional position along the fade zone [0..1]
-        // 0 = transparent edge, 1 = opaque centre
-        function fadeAlpha(t) {
-            var a = Math.pow(t, curvePow)
-            return edgeAlpha + (baseAlpha - edgeAlpha) * a
-        }
-
-        // ── Background: single base rectangle ──────────────────────────────
-        Rectangle {
-            id: bgBase
+        // Four-sided edge fade via EdgeFadeBackground
+        EdgeFadeBackground {
             anchors.fill: parent
+            baseColor: view.backgroundBase
+            centerAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
+            edgeAlpha: (1.0 - Plasmoid.configuration.edgeOpacity / 100.0)
+            fadeWidth: Plasmoid.configuration.edgeWidth
+            curve: Plasmoid.configuration.edgeCurve / 100.0
             radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g,
-                           view.backgroundBase.b, view.baseAlpha)
-            visible: view.edgeFraction === 0
-        }
-
-        // ── Background: four-sided fade (horizontal layer) ─────────────────
-        Rectangle {
-            id: bgH
-            anchors.fill: parent
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            color: "transparent"
-            visible: view.edgeFraction > 0
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0;                        color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.0)) }
-                GradientStop { position: view.edgeFraction * 0.33;   color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.33)) }
-                GradientStop { position: view.edgeFraction * 0.67;   color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.67)) }
-                GradientStop { position: view.edgeFraction;          color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.baseAlpha) }
-                GradientStop { position: 1.0 - view.edgeFraction;    color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.baseAlpha) }
-                GradientStop { position: 1.0 - view.edgeFraction * 0.67; color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.67)) }
-                GradientStop { position: 1.0 - view.edgeFraction * 0.33; color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.33)) }
-                GradientStop { position: 1.0;                        color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b, view.fadeAlpha(0.0)) }
-            }
-        }
-
-        // ── Background: vertical fade layer (top & bottom) ─────────────────
-        Rectangle {
-            id: bgVTop
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: view.edgeFraction * parent.height
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
-            color: "transparent"
-            visible: view.edgeFraction > 0
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, view.baseAlpha - view.fadeAlpha(0.0)) }
-                GradientStop { position: 0.5; color: Qt.rgba(0, 0, 0, view.baseAlpha - view.fadeAlpha(0.5)) }
-                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0) }
-            }
-            // Use blend mode Multiply to subtract from horizontal layer
-            layer.enabled: true
-            layer.effect: null
-            // Simple approach: just additional transparent-to-transparent overlay
-            // that darkens top edge proportionally
-        }
-
-        // Simpler & more reliable vertical fade: two separate overlay rectangles
-        // that alpha-knock-down the top and bottom edges of the combined background
-        Rectangle {
-            id: bgVTopMask
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: Math.round(view.edgeFraction * parent.height)
-            visible: view.edgeFraction > 0
-            color: "transparent"
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop { position: 0.0; color: Kirigami.Theme.backgroundColor.toString() === "#00000000"
-                    ? "transparent"
-                    : Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b,
-                              Math.max(0, view.baseAlpha - view.fadeAlpha(0.0))) }
-                GradientStop { position: 1.0; color: "transparent" }
-            }
-        }
-        Rectangle {
-            id: bgVBottomMask
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: Math.round(view.edgeFraction * parent.height)
-            visible: view.edgeFraction > 0
-            color: "transparent"
-            gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 1.0; color: Qt.rgba(view.backgroundBase.r, view.backgroundBase.g, view.backgroundBase.b,
-                              Math.max(0, view.baseAlpha - view.fadeAlpha(0.0))) }
-            }
         }
 
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: root.pad
             spacing: 4
-            opacity: 1.0
 
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
                 Kirigami.Icon { source: "drive-harddisk"; Layout.preferredWidth: 22; Layout.preferredHeight: 22 }
-                PC3.Label { text: root.tr2("Диски", "Drives"); color: view.labelColor; font.bold: true; font.pixelSize: root.fontPx(20); Layout.fillWidth: true }
+                PC3.Label { text: root.tr2("\u0414\u0438\u0441\u043a\u0438", "Drives"); color: view.labelColor; font.bold: true; font.pixelSize: root.fontPx(20); Layout.fillWidth: true }
                 PC3.Label { text: drives.count; color: view.labelColor; opacity: 0.72; font.pixelSize: root.fontPx(13) }
             }
 
@@ -407,24 +312,30 @@ PlasmoidItem {
 
                     width: list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
-                    hoverEnabled: true
-                    highlighted: false
+                    padding: 0
+                    leftPadding: 0
+                    rightPadding: 0
+                    topPadding: 0
+                    bottomPadding: 0
 
+                    // Open drive on click
+                    onClicked: root.openTarget(target)
+
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.text: source + "\n" + target
+
+                    // Subtle hover highlight using Kirigami palette
                     background: Rectangle {
                         color: parent.hovered
                             ? Qt.rgba(Kirigami.Theme.highlightColor.r,
                                       Kirigami.Theme.highlightColor.g,
                                       Kirigami.Theme.highlightColor.b, 0.12)
                             : "transparent"
-                        radius: 6
+                        radius: Plasmoid.configuration.rounded
+                            ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad)
+                            : 0
                         Behavior on color { ColorAnimation { duration: 120 } }
                     }
-
-                    onClicked: root.openTarget(target)
-
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: source + "\n" + target
-                    QQC2.ToolTip.delay: 600
 
                     contentItem: RowLayout {
                         anchors.fill: parent
@@ -455,7 +366,7 @@ PlasmoidItem {
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
                             PC3.Label {
-                                text: root.formatBytes(available) + " " + root.tr2("свободно из", "free of") + " " + root.formatBytes(total)
+                                text: root.formatBytes(available) + " " + root.tr2("\u0441\u0432\u043e\u0431\u043e\u0434\u043d\u043e \u0438\u0437", "free of") + " " + root.formatBytes(total)
                                 color: view.labelColor; font.pixelSize: root.fontPx(16)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
@@ -464,7 +375,7 @@ PlasmoidItem {
                                 text: {
                                     var a = Plasmoid.configuration.showFs ? fs : ""
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
-                                    return a && b ? a + "  •  " + b : a + b
+                                    return a && b ? a + "  \u2022  " + b : a + b
                                 }
                                 color: view.labelColor; opacity: 0.72
                                 font.pixelSize: root.fontPx(13)
@@ -482,7 +393,7 @@ PlasmoidItem {
                             }
                             PC3.Label {
                                 Layout.alignment: Qt.AlignRight
-                                text: used + "% " + root.tr2("занято", "used")
+                                text: used + "% " + root.tr2("\u0437\u0430\u043d\u044f\u0442\u043e", "used")
                                 color: view.labelColor; font.pixelSize: root.fontPx(13)
                             }
                         }
@@ -493,8 +404,8 @@ PlasmoidItem {
                     anchors.centerIn: parent
                     visible: drives.count === 0
                     text: root.scanRunning
-                        ? root.tr2("Обновление…", "Refreshing…")
-                        : root.tr2("Доступные диски не найдены", "No accessible drives found")
+                        ? root.tr2("\u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435\u2026", "Refreshing\u2026")
+                        : root.tr2("\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u0434\u0438\u0441\u043a\u0438 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d\u044b", "No accessible drives found")
                     color: view.labelColor
                     opacity: 0.75
                     font.pixelSize: root.fontPx(15)

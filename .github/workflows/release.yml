@@ -14,39 +14,25 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
       - name: Install zip support
-        run: sudo apt-get update && sudo apt-get install -y zip
+        run: sudo apt-get update && sudo apt-get install -y zip python3
       - name: Check and build
         run: ./scripts/check.sh
-      - name: Get version and release name
+      - name: Read version from metadata
         id: meta
         run: |
           VER=$(python3 -c "import json; print(json.load(open('package/metadata.json'))['KPlugin']['Version'])")
-          TAG=${{ github.event.inputs.tag || github.ref_name }}
-          echo "ver=$VER" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          if echo "$TAG" | grep -qi 'beta\|alpha\|rc'; then
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          if echo "$VER" | grep -qiE 'alpha|beta|rc'; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           else
             echo "prerelease=false" >> "$GITHUB_OUTPUT"
           fi
-      - name: Verify tag matches metadata version
-        run: |
-          TAG=${{ github.event.inputs.tag || github.ref_name }}
-          VER=${{ steps.meta.outputs.ver }}
-          EXPECTED="v${VER}"
-          if [[ "$TAG" != "$EXPECTED" ]]; then
-            echo "Ошибка: тег $TAG не совпадает с версией в metadata.json ($EXPECTED)" >&2
-            exit 1
-          fi
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: Drive Cards ${{ steps.meta.outputs.ver }}
-          prerelease: ${{ steps.meta.outputs.prerelease }}
+          name: Drive Cards ${{ steps.meta.outputs.version }}
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           generate_release_notes: true
           files: |
             dist/*.plasmoid

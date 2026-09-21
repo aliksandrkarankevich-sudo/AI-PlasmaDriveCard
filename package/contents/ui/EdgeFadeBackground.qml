@@ -1,184 +1,148 @@
-// EdgeFadeBackground.qml — four-sided symmetric fade overlay
+// EdgeFadeBackground.qml
+// Four-sided fade from centerAlpha at the centre to transparent at all edges.
+// Uses two layered Rectangles with orthogonal Gradient to avoid ShaderEffect
+// compatibility issues across different GPU drivers on Plasma 6.
 import QtQuick
+import org.kde.plasma.plasmoid
+import org.kde.kirigami as Kirigami
 
 Item {
     id: root
 
-    // These properties are set from the parent (main.qml)
-    property color  baseColor:     "black"
-    property real   centerAlpha:   0.4
-    property real   edgeAlpha:     0.0
-    property real   edgeFraction:  0.15   // 0..0.45, fraction of each side
-    property real   curve:         0.0    // -1..1 shape of the gradient
-    property real   radius:        0.0
+    // Public API
+    property color baseColor: "black"
+    property real  centerAlpha: 0.4   // opacity of the solid centre (0..1)
+    property real  edgeAlpha:   1.0   // how transparent the edge is (0 = same as centre, 1 = fully transparent)
+    property real  fadeWidth:   30    // px — width of the fade band on each side
+    property real  curve:       0.0   // -1..1, negative = slow start, positive = slow end
+    property real  radius:      0     // corner radius in px
 
-    // Shared helper: 8-stop smooth fade from edgeAlpha → centerAlpha
-    // using a simple cubic-ease shape controlled by curve (-1..1).
-    // Negative curve → concave (fade lingers near edge)
-    // Zero           → cosine-like balanced fade
-    // Positive curve → convex (fade completes quickly)
+    // Derived
+    readonly property real _edgeFinal: centerAlpha * (1.0 - Math.max(0, Math.min(1, edgeAlpha)))
+    readonly property real _fw: (fadeWidth <= 0) ? 0
+        : Math.min(0.48, fadeWidth / Math.max(1, Math.min(width, height)))
+
+    // Helper: map fraction t through a soft curve
+    // curve > 0  → ease-in (slow at edge, fast toward center)
+    // curve < 0  → ease-out (fast at edge, slow toward center)
     function _stop(t) {
-        // t is 0.0 (edge) → 1.0 (centre)
-        var s
-        if (curve >= 0) {
-            s = 1.0 - Math.pow(1.0 - t, 1.0 + curve * 2.5)
-        } else {
-            s = Math.pow(t, 1.0 - curve * 2.5)
-        }
-        return edgeAlpha + (centerAlpha - edgeAlpha) * s
+        var c = Math.max(-1, Math.min(1, curve))
+        if (Math.abs(c) < 0.01) return t
+        if (c > 0) return Math.pow(t, 1.0 + c * 2.0)
+        return 1.0 - Math.pow(1.0 - t, 1.0 - c * 2.0)
     }
 
-    // ── Solid centre fill ───────────────────────────────────────────
+    // ── Solid centre base ────────────────────────────────────────────────────
     Rectangle {
         anchors.fill: parent
         radius: root.radius
-        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                       root.centerAlpha)
+        color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, root._edgeFinal)
     }
 
-    // ── LEFT fade ───────────────────────────────────────────────────
+    // ── Horizontal fade (left & right) ───────────────────────────────────────
     Rectangle {
-        visible: root.edgeFraction > 0
-        x: 0; y: 0
-        width:  Math.round(parent.width  * root.edgeFraction)
-        height: parent.height
+        anchors.fill: parent
         radius: root.radius
+        color: "transparent"
+        visible: root._fw > 0
         gradient: Gradient {
             orientation: Gradient.Horizontal
-            GradientStop { position: 0.000
+
+            // LEFT edge → centre
+            GradientStop {
+                position: 0.0
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.edgeAlpha) }
-            GradientStop { position: 0.143
+                               root.centerAlpha * (1.0 - root._stop(0.0 / Math.max(root._fw, 0.001))))
+            }
+            GradientStop {
+                position: root._fw * root._stop(0.33)
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.143)) }
-            GradientStop { position: 0.286
+                               root.centerAlpha * (1.0 - root._edgeFinal / root.centerAlpha +
+                                                   root._edgeFinal / root.centerAlpha * root._stop(0.33)))
+            }
+            GradientStop {
+                position: root._fw
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.286)) }
-            GradientStop { position: 0.429
+                               root.centerAlpha - root._edgeFinal)
+            }
+            // Flat centre
+            GradientStop {
+                position: root._fw + 0.001
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0)
+            }
+            GradientStop {
+                position: 1.0 - root._fw - 0.001
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0)
+            }
+            // RIGHT centre → edge
+            GradientStop {
+                position: 1.0 - root._fw
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.429)) }
-            GradientStop { position: 0.571
+                               root.centerAlpha - root._edgeFinal)
+            }
+            GradientStop {
+                position: 1.0 - root._fw * root._stop(0.33)
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.571)) }
-            GradientStop { position: 0.714
+                               root.centerAlpha * (1.0 - root._edgeFinal / root.centerAlpha +
+                                                   root._edgeFinal / root.centerAlpha * root._stop(0.33)))
+            }
+            GradientStop {
+                position: 1.0
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.714)) }
-            GradientStop { position: 0.857
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.857)) }
-            GradientStop { position: 1.000
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.centerAlpha) }
+                               root.centerAlpha * (1.0 - root._stop(0.0 / Math.max(root._fw, 0.001))))
+            }
         }
     }
 
-    // ── RIGHT fade ──────────────────────────────────────────────────
+    // ── Vertical fade (top & bottom) ─────────────────────────────────────────
     Rectangle {
-        visible: root.edgeFraction > 0
-        x: parent.width - Math.round(parent.width * root.edgeFraction)
-        y: 0
-        width:  Math.round(parent.width  * root.edgeFraction)
-        height: parent.height
+        anchors.fill: parent
         radius: root.radius
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0.000
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.centerAlpha) }
-            GradientStop { position: 0.143
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.857)) }
-            GradientStop { position: 0.286
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.714)) }
-            GradientStop { position: 0.429
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.571)) }
-            GradientStop { position: 0.571
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.429)) }
-            GradientStop { position: 0.714
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.286)) }
-            GradientStop { position: 0.857
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.143)) }
-            GradientStop { position: 1.000
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.edgeAlpha) }
-        }
-    }
-
-    // ── TOP fade ────────────────────────────────────────────────────
-    Rectangle {
-        visible: root.edgeFraction > 0
-        x: 0; y: 0
-        width:  parent.width
-        height: Math.round(parent.height * root.edgeFraction)
-        radius: root.radius
+        color: "transparent"
+        visible: root._fw > 0
         gradient: Gradient {
             orientation: Gradient.Vertical
-            GradientStop { position: 0.000
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.edgeAlpha) }
-            GradientStop { position: 0.143
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.143)) }
-            GradientStop { position: 0.286
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.286)) }
-            GradientStop { position: 0.429
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.429)) }
-            GradientStop { position: 0.571
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.571)) }
-            GradientStop { position: 0.714
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.714)) }
-            GradientStop { position: 0.857
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.857)) }
-            GradientStop { position: 1.000
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.centerAlpha) }
-        }
-    }
 
-    // ── BOTTOM fade ─────────────────────────────────────────────────
-    Rectangle {
-        visible: root.edgeFraction > 0
-        x: 0
-        y: parent.height - Math.round(parent.height * root.edgeFraction)
-        width:  parent.width
-        height: Math.round(parent.height * root.edgeFraction)
-        radius: root.radius
-        gradient: Gradient {
-            orientation: Gradient.Vertical
-            GradientStop { position: 0.000
+            GradientStop {
+                position: 0.0
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.centerAlpha) }
-            GradientStop { position: 0.143
+                               root.centerAlpha * (1.0 - root._stop(0.0 / Math.max(root._fw, 0.001))))
+            }
+            GradientStop {
+                position: root._fw * root._stop(0.33)
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.857)) }
-            GradientStop { position: 0.286
+                               root.centerAlpha * (1.0 - root._edgeFinal / root.centerAlpha +
+                                                   root._edgeFinal / root.centerAlpha * root._stop(0.33)))
+            }
+            GradientStop {
+                position: root._fw
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.714)) }
-            GradientStop { position: 0.429
+                               root.centerAlpha - root._edgeFinal)
+            }
+            GradientStop {
+                position: root._fw + 0.001
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0)
+            }
+            GradientStop {
+                position: 1.0 - root._fw - 0.001
+                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b, 0)
+            }
+            GradientStop {
+                position: 1.0 - root._fw
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.571)) }
-            GradientStop { position: 0.571
+                               root.centerAlpha - root._edgeFinal)
+            }
+            GradientStop {
+                position: 1.0 - root._fw * root._stop(0.33)
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.429)) }
-            GradientStop { position: 0.714
+                               root.centerAlpha * (1.0 - root._edgeFinal / root.centerAlpha +
+                                                   root._edgeFinal / root.centerAlpha * root._stop(0.33)))
+            }
+            GradientStop {
+                position: 1.0
                 color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.286)) }
-            GradientStop { position: 0.857
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root._stop(0.143)) }
-            GradientStop { position: 1.000
-                color: Qt.rgba(root.baseColor.r, root.baseColor.g, root.baseColor.b,
-                               root.edgeAlpha) }
+                               root.centerAlpha * (1.0 - root._stop(0.0 / Math.max(root._fw, 0.001))))
+            }
         }
     }
 }
