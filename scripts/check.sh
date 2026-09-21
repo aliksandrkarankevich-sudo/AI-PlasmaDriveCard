@@ -61,14 +61,16 @@ else
     ok "No standalone folder-open ToolButton in main.qml"
 fi
 
-# 8. EdgeFadeBackground.qml has four-sided fade (both Horizontal and Vertical gradients)
-#    Since beta2 the gradients live in EdgeFadeBackground.qml, not main.qml.
+# 8. EdgeFadeBackground.qml implements four-sided fade
+# Since beta2 the fade is done via a Canvas pixel loop, not QML Gradient items.
+# We check for the characteristic pixel-loop identifiers instead.
 EDGE_QML="${PACKAGE_DIR}/contents/ui/EdgeFadeBackground.qml"
 if [[ -f "${EDGE_QML}" ]]; then
-    H="$(grep -c 'Gradient.Horizontal' "${EDGE_QML}" || true)"
-    V="$(grep -c 'Gradient.Vertical' "${EDGE_QML}" || true)"
-    [[ "${H}" -ge 1 ]] && ok "EdgeFadeBackground.qml has Horizontal gradient mask" || fail "EdgeFadeBackground.qml missing Horizontal gradient mask"
-    [[ "${V}" -ge 1 ]] && ok "EdgeFadeBackground.qml has Vertical gradient mask" || fail "EdgeFadeBackground.qml missing Vertical gradient mask"
+    if grep -q 'Canvas' "${EDGE_QML}" && grep -q '_fwH' "${EDGE_QML}" && grep -q '_fwV' "${EDGE_QML}"; then
+        ok "EdgeFadeBackground.qml implements four-sided Canvas fade"
+    else
+        fail "EdgeFadeBackground.qml missing expected Canvas fade implementation (_fwH/_fwV)"
+    fi
 else
     fail "EdgeFadeBackground.qml not found"
 fi
