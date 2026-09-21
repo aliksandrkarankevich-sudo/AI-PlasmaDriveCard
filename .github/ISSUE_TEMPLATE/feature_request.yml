@@ -1,0 +1,75 @@
+name: "💡 Предложение / Feature Request"
+description: "Предложите новую функцию или улучшение для Drive Cards"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 💡 Предложение по улучшению
+        Спасибо, что делаете виджет лучше! Заполните форму ниже.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "Кратко опишите идею"
+      description: "В одном-двух предложениях — что вы хотите добавить или изменить?"
+      placeholder: "Например: хочу видеть температуру накопителя рядом с его именем"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: "Какую задачу это решает?"
+      description: "Опишите ситуацию, в которой текущее поведение вас не устраивает"
+      placeholder: "Когда у меня много дисков, я не могу быстро понять какой из них перегревается..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: "Как должна работать новая функция?"
+      description: "Максимально конкретно — что отображается, где, как настраивается"
+      placeholder: "Рядом с именем накопителя показывать температуру в °C. Данные брать из /sys/class/hwmon. Цвет: зелёный до 50°, жёлтый 50–70°, красный выше 70°."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: "Рассматривали ли альтернативы?"
+      description: "Другие способы решить ту же задачу, плагины, сторонние инструменты"
+    validations:
+      required: false
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: "Насколько важна для вас эта функция?"
+      options:
+        - "🔴 Критично — без неё виджет почти бесполезен"
+        - "🟡 Важно — использовал бы постоянно"
+        - "🟢 Удобно — nice to have"
+        - "⚪ Низкий приоритет — просто идея"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: "Версия виджета"
+      placeholder: "0.95.0-beta2"
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Чеклист"
+      options:
+        - label: "Я проверил существующие Issues — такого предложения ещё нет"
+          required: true
+        - label: "Я готов помочь с реализацией (PR)"
+          required: false

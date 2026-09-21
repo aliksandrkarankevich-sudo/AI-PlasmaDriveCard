@@ -1,7 +1,7 @@
 # Drive Cards
 
 ![Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)
-![Version](https://img.shields.io/badge/version-0.95.0--beta1-orange)
+![Version](https://img.shields.io/badge/version-0.95.0--beta2-orange)
 ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-green)
 
 Небольшой полупрозрачный виджет дисков для KDE Plasma 6 и CachyOS. Показывает смонтированные локальные разделы, свободное место, файловую систему и краткое имя физического накопителя.
@@ -47,7 +47,9 @@ kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
 
 Либо откройте файл через Plasma: правая кнопка на рабочем столе → **Добавить виджеты** → **Установить виджет из локального файла**.
 
-### Способ 3 — Из исходников (для разработки и тестирования)
+### Способ 3 — Через Git (стабильная ветка main)
+
+Клонирует репозиторий и запускает скрипт установки:
 
 ```bash
 git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
@@ -55,12 +57,26 @@ cd AI-PlasmaDriveCard
 ./scripts/install.sh
 ```
 
-Для beta-ветки:
+### Способ 4 — Через Git (бета-версия)
+
+Для тестирования последних изменений до официального релиза:
 
 ```bash
 git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
   https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
+./scripts/install.sh
+```
+
+> ⚠️ Бета-ветка может содержать нестабильный код. Перед установкой сохраните текущую версию.
+
+#### Обновление через Git
+
+Если виджет уже установлен из Git, для обновления до последнего коммита:
+
+```bash
+cd AI-PlasmaDriveCard
+git pull
 ./scripts/install.sh
 ```
 
@@ -93,9 +109,13 @@ kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
 ```
 
+## 💡 Предложения и идеи
+
+Есть идея по улучшению? Откройте [Issue с шаблоном Feature Request](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues/new?template=feature_request.yml) — опишите что хотите и зачем.
+
 ## Статус
 
-0.95.0-beta1 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
+0.95.0-beta2 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
 
 ## Лицензия
 
