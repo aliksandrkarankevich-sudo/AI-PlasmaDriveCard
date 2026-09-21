@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Вопрос по использованию
-    url: https://github.com/aliksandrkarankevich-sudo/cachyos-drive-card/discussions
+    url: https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues
     about: Вопросы, которые не являются ошибками или запросами функций
