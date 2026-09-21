@@ -23,5 +23,5 @@
 - Переработан расчёт автоматической высоты.
 - Восстановлено полное представление Plasma.
 
-[Unreleased]: https://github.com/aliksandrkarankevich-sudo/cachyos-drive-card/compare/v0.95.0-beta1...HEAD
-[0.95.0-beta1]: https://github.com/aliksandrkarankevich-sudo/cachyos-drive-card/releases/tag/v0.95.0-beta1
+[Unreleased]: https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/compare/v0.95.0-beta1...HEAD
+[0.95.0-beta1]: https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/releases/tag/v0.95.0-beta1
