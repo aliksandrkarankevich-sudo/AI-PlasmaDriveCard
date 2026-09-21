@@ -82,7 +82,7 @@ PlasmoidItem {
         var lsblkData
         try {
             findmntData = JSON.parse(output.substring(0, markerIndex).trim())
-            lsblkData = JSON.parse(output.substring(markerIndex + marker.length).trim())
+            lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
             return
@@ -91,10 +91,10 @@ PlasmoidItem {
         var blocks = lsblkData.blockdevices || []
         for (var i = 0; i < blocks.length; ++i) {
             var block = blocks[i]
-            map[block.name] = block
-            if (block.path) map[block.path] = block
-            map["/dev/" + block.name] = block
-            map["/dev/mapper/" + block.name] = block
+            map[block.name]                   = block
+            if (block.path) map[block.path]   = block
+            map["/dev/" + block.name]         = block
+            map["/dev/mapper/" + block.name]  = block
         }
         var all = []
         var rows = []
@@ -108,12 +108,12 @@ PlasmoidItem {
             if (!Plasmoid.configuration.showRoot && target === "/") continue
             if (!Plasmoid.configuration.showBoot && (target === "/boot" || target === "/boot/efi")) continue
             if (seen[source]) continue
-            var size = Number(fs.size) || 0
+            var size      = Number(fs.size)  || 0
             var available = Number(fs.avail) || 0
-            var used = parseInt(String(fs["use%"] || "0")) || 0
-            var label = fs.label || ""
-            if (target === "/") label = tr2("Система", "System")
-            else if (!label) label = basename(target)
+            var used      = parseInt(String(fs["use%"] || "0")) || 0
+            var label     = fs.label || ""
+            if (target === "/")   label = tr2("Система", "System")
+            else if (!label)      label = basename(target)
             var physical = shortDrive(source, map)
             rows.push({
                 title: label, target: target, source: source,
@@ -125,7 +125,7 @@ PlasmoidItem {
         }
         rows.sort(function(a, b) {
             if (a.target === "/") return -1
-            if (b.target === "/") return 1
+            if (b.target === "/") return  1
             return a.title.localeCompare(b.title)
         })
         drives.clear()
@@ -151,7 +151,9 @@ PlasmoidItem {
             if (parts.length >= 11) current[parts[2]] = String(parts[3]) + ":" + String(parts[7])
         }
         for (var j = 0; j < drives.count; ++j) {
-            var row = drives.get(j), now = current[row.kname], before = previousIo[row.kname]
+            var row = drives.get(j)
+            var now    = current[row.kname]
+            var before = previousIo[row.kname]
             drives.setProperty(j, "active", now !== undefined && before !== undefined && now !== before)
         }
         previousIo = current
@@ -164,14 +166,14 @@ PlasmoidItem {
     }
 
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
-    readonly property string scanScript: "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
+    readonly property string scanScript:
+        "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
         + "printf '\\n__DC_LSBLK__\\n'; "
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
-    // autoFit: explicit height forces Plasma Desktop to actually resize the widget
-    width:  470
-    height: Plasmoid.configuration.autoFit ? wantedHeight : Math.max(220, implicitHeight)
+    // autoFit: lock all three Layout heights to wantedHeight so Plasma Desktop resizes.
+    // No explicit width/height on PlasmoidItem — let Plasma manage geometry.
     Layout.minimumWidth:   360
     Layout.preferredWidth: 470
     Layout.minimumHeight:  Plasmoid.configuration.autoFit ? wantedHeight : 220
@@ -220,10 +222,10 @@ PlasmoidItem {
 
     fullRepresentation: Item {
         id: view
+
         implicitWidth:  470
         implicitHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 420
-        // explicit height mirrors PlasmoidItem so the container follows
-        height: Plasmoid.configuration.autoFit ? root.wantedHeight : Math.max(220, implicitHeight)
+
         Layout.minimumWidth:   360
         Layout.preferredWidth: 470
         Layout.minimumHeight:  Plasmoid.configuration.autoFit ? root.wantedHeight : 220
@@ -234,7 +236,8 @@ PlasmoidItem {
             ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
         readonly property color textBase: Plasmoid.configuration.textColorMode === "custom"
             ? Plasmoid.configuration.textColor : Kirigami.Theme.textColor
-        readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
+        readonly property color labelColor: Qt.rgba(
+            textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
 
         EdgeFadeBackground {

@@ -1,77 +1,73 @@
 // EdgeFadeBackground.qml
-// Single-pass ShaderEffect background:
-//   - no Qt5Compat dependency
-//   - no corner overlap / darkening
-//   - perceptually smooth fade via smoothstep + pow curve
+// Single-pass ShaderEffect background (Qt6 inline GLSL, no Qt5Compat).
+// Uses layer.enabled on a Rectangle for correct RHI clipping.
+// Corner logic: t = min(tx, ty) — no overlap, no darkening.
 import QtQuick
 
 Item {
     id: root
 
     property color baseColor:   "black"
-    property real  centerAlpha: 0.4   // alpha at centre (0..1)
-    property real  edgeAlpha:   1.0   // fade strength: 0=no fade, 1=fully transparent edge
-    property real  fadeWidth:   30    // px — fade band width
-    property real  curve:       0.0   // 0=smoothstep, >0=steeper, <0=softer  (maps to pow exponent)
+    property real  centerAlpha: 0.4
+    property real  edgeAlpha:   1.0   // 0 = no fade, 1 = fully transparent edge
+    property real  fadeWidth:   30    // px
+    property real  curve:       0.0   // -1..+1, mapped to pow exponent
     property real  radius:      0
 
-    // Normalised fade width (0..0.5) passed to shader
     readonly property real _fwNorm: (width > 0 && height > 0)
         ? Math.max(0.0, Math.min(0.45, fadeWidth / Math.min(width, height)))
         : 0.0
-    readonly property real _ea: Math.max(0.0, Math.min(1.0, edgeAlpha))
-    // pow exponent: curve==0 → exp=2 (smooth), curve==1 → exp=4 (sharp), curve==-1 → exp=1 (linear)
-    readonly property real _exp: Math.max(0.5, 2.0 + curve * 2.0)
+    readonly property real _ea:  Math.max(0.0, Math.min(1.0, edgeAlpha))
+    readonly property real _exp: Math.max(0.25, 2.0 + curve * 2.0)
 
-    // Clip to rounded rectangle so shader corners are clean
     Rectangle {
-        id: clipRect
+        id: bgRect
         anchors.fill: parent
         radius: root.radius
         color: "transparent"
-        clip: true
+
+        // layer clips ShaderEffect to rounded rect in RHI mode
+        layer.enabled: root.radius > 0
+        layer.smooth:  true
 
         ShaderEffect {
             anchors.fill: parent
 
-            // uniforms
-            property vector3d baseRGB: Qt.vector3d(root.baseColor.r, root.baseColor.g, root.baseColor.b)
-            property real centerAlpha: root.centerAlpha
+            property real rW:           root.width
+            property real rH:           root.height
+            property real fw:           root._fwNorm
+            property real expVal:       root._exp
+            property real centerAlpha:  root.centerAlpha
             property real edgeStrength: root._ea
-            property real fw: root._fwNorm
-            property real exp_: root._exp
+            property real baseR:        root.baseColor.r
+            property real baseG:        root.baseColor.g
+            property real baseB:        root.baseColor.b
 
             fragmentShader: "
-                #version 440
-                layout(location = 0) in vec2 qt_TexCoord0;
-                layout(location = 0) out vec4 fragColor;
-
-                layout(std140, binding = 0) uniform buf {
-                    mat4 qt_Matrix;
-                    float qt_Opacity;
-                    vec3  baseRGB;
-                    float centerAlpha;
-                    float edgeStrength;
-                    float fw;
-                    float exp_;
-                };
+                uniform lowp float qt_Opacity;
+                uniform highp float rW;
+                uniform highp float rH;
+                uniform highp float fw;
+                uniform highp float expVal;
+                uniform highp float centerAlpha;
+                uniform highp float edgeStrength;
+                uniform highp float baseR;
+                uniform highp float baseG;
+                uniform highp float baseB;
+                varying highp vec2 qt_TexCoord0;
 
                 void main() {
-                    vec2 uv = qt_TexCoord0;               // 0..1
-                    // distance from each edge, normalised 0..1 within fade band
-                    float dx = min(uv.x, 1.0 - uv.x);   // dist to left/right edge
-                    float dy = min(uv.y, 1.0 - uv.y);   // dist to top/bottom edge
-                    // t=0 at edge, t=1 inside fade band
-                    float tx = (fw > 0.0) ? clamp(dx / fw, 0.0, 1.0) : 1.0;
-                    float ty = (fw > 0.0) ? clamp(dy / fw, 0.0, 1.0) : 1.0;
-                    float t  = min(tx, ty);              // corner = min of both axes — no overlap
-                    // smooth curve
-                    float s  = smoothstep(0.0, 1.0, t);
-                    s        = pow(s, exp_);
-                    // alpha: edge is centerAlpha*(1-edgeStrength), centre is centerAlpha
-                    float edgeAlpha = centerAlpha * (1.0 - edgeStrength);
-                    float alpha = mix(edgeAlpha, centerAlpha, s) * qt_Opacity;
-                    fragColor = vec4(baseRGB * alpha, alpha);
+                    highp vec2 uv = qt_TexCoord0;
+                    highp float dx = min(uv.x, 1.0 - uv.x);
+                    highp float dy = min(uv.y, 1.0 - uv.y);
+                    highp float tx = (fw > 0.0) ? clamp(dx / fw, 0.0, 1.0) : 1.0;
+                    highp float ty = (fw > 0.0) ? clamp(dy / fw, 0.0, 1.0) : 1.0;
+                    highp float t  = min(tx, ty);
+                    highp float s  = smoothstep(0.0, 1.0, t);
+                    s = pow(s, expVal);
+                    highp float edgeA = centerAlpha * (1.0 - edgeStrength);
+                    highp float alpha = mix(edgeA, centerAlpha, s) * qt_Opacity;
+                    gl_FragColor = vec4(baseR * alpha, baseG * alpha, baseB * alpha, alpha);
                 }
             "
         }
