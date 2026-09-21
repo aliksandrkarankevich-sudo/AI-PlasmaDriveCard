@@ -17,7 +17,6 @@ PlasmoidItem {
         pad * 2 + 38 + Math.max(1, drives.count) * rowH))
     property bool scanRunning: false
     property bool activityRunning: false
-    property bool watchersRunning: false
     property var previousIo: ({})
 
     function tr2(r, e) { return ru ? r : e }
@@ -156,32 +155,12 @@ PlasmoidItem {
         }
         previousIo = current
     }
-    function stopWatchers() {
-        executable.disconnectSource(mountWatchCommand)
-        executable.disconnectSource(udevWatchCommand)
-        watchersRunning = false
-    }
-    function startWatchers() {
-        if (watchersRunning) return
-        watchersRunning = true
-        executable.connectSource(mountWatchCommand)
-        executable.connectSource(udevWatchCommand)
-    }
-    function storageEvent() {
-        stopWatchers()
-        refresh(1200)
-        watcherRestart.restart()
-    }
 
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript: "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
         + "printf '\\n__DC_LSBLK__\\n'; "
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
-    readonly property string mountWatchCommand: "/usr/bin/findmnt --poll=mount,umount,move,remount --first-only --output ACTION,TARGET"
-    readonly property string udevWatchCommand: "/bin/sh -c \"" + udevWatchScript + "\""
-    readonly property string udevWatchScript: "LC_ALL=C stdbuf -oL udevadm monitor --udev --subsystem-match=block --property 2>/dev/null "
-        + "| grep -m1 -E '^ACTION=(add|remove|change)$'"
 
     Layout.minimumWidth: 360
     Layout.preferredWidth: 470
@@ -204,22 +183,26 @@ PlasmoidItem {
                 disconnectSource(sourceName)
                 root.activityRunning = false
                 root.applyActivity(data["stdout"] || "")
-            } else if (sourceName === root.mountWatchCommand || sourceName === root.udevWatchCommand) {
-                root.storageEvent()
             }
         }
     }
-    Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
-    Timer { id: watcherRestart; interval: 1800; repeat: false; onTriggered: root.startWatchers() }
+
+    // Main poll timer — runs findmnt + lsblk on schedule
     Timer {
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
-        repeat: true; running: true; onTriggered: root.refresh(0)
+        repeat: true; running: true; triggeredOnStart: true
+        onTriggered: root.refresh(0)
     }
+
+    // Activity poll timer — reads /proc/diskstats
     Timer {
         interval: Math.max(1, Plasmoid.configuration.activityInterval) * 1000
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
+
+    Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
+
     Timer {
         id: fitTimer; interval: 150; repeat: false
         onTriggered: {
@@ -230,6 +213,7 @@ PlasmoidItem {
             root.height = root.wantedHeight
         }
     }
+
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged() { root.refresh(0) }
@@ -238,8 +222,8 @@ PlasmoidItem {
         function onMaxHeightChanged() { fitTimer.restart() }
         function onAutoFitChanged()   { fitTimer.restart() }
     }
-    Component.onCompleted: { refresh(0); startWatchers() }
-    Component.onDestruction: stopWatchers()
+
+    Component.onCompleted: root.refresh(0)
 
     fullRepresentation: Item {
         id: view
