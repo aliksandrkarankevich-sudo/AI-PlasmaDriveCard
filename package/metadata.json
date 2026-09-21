@@ -16,5 +16,6 @@
     "Version": "0.95.0-beta2"
   },
   "KPackageStructure": "Plasma/Applet",
-  "X-Plasma-API-Minimum-Version": "6.0"
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "X-Plasma-BackgroundHints": "NoBackground"
 }

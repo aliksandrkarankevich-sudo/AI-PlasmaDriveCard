@@ -167,7 +167,6 @@ PlasmoidItem {
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
-    // autoFit: Layout bindings on PlasmoidItem react to wantedHeight automatically
     Layout.minimumWidth: 360
     Layout.preferredWidth: 470
     Layout.minimumHeight: Plasmoid.configuration.autoFit ? wantedHeight : 220
@@ -193,30 +192,23 @@ PlasmoidItem {
         }
     }
 
-    // Main scan timer — first scan via Component.onCompleted (Qt.callLater)
     Timer {
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat: true; running: true
         onTriggered: root.refresh(0)
     }
-
-    // Activity poll timer
     Timer {
         interval: Math.max(1, Plasmoid.configuration.activityInterval) * 1000
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
-
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
     Connections {
         target: Plasmoid.configuration
-        function onShowRootChanged()    { root.refresh(0) }
-        function onShowBootChanged()    { root.refresh(0) }
-        function onIconStyleChanged()   { root.refreshIcons() }
-        function onRowHeightChanged()   { /* wantedHeight binding auto-updates */ }
-        function onMaxHeightChanged()   { /* wantedHeight binding auto-updates */ }
-        function onAutoFitChanged()     { /* Layout bindings auto-update */ }
+        function onShowRootChanged()  { root.refresh(0) }
+        function onShowBootChanged()  { root.refresh(0) }
+        function onIconStyleChanged() { root.refreshIcons() }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
@@ -224,7 +216,6 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: view
         implicitWidth: 470
-        // implicitHeight tracks wantedHeight reactively — no fitTimer needed
         implicitHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 420
         Layout.minimumWidth: 360
         Layout.preferredWidth: 470
@@ -301,10 +292,8 @@ PlasmoidItem {
 
                     width:  list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
-
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
-
                     onClicked: root.openTarget(target)
 
                     QQC2.ToolTip.visible: hovered
@@ -318,8 +307,7 @@ PlasmoidItem {
                                       Kirigami.Theme.highlightColor.b, 0.12)
                             : "transparent"
                         radius: Plasmoid.configuration.rounded
-                            ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad)
-                            : 0
+                            ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad) : 0
                         Behavior on color { ColorAnimation { duration: 120 } }
                     }
 
@@ -360,8 +348,7 @@ PlasmoidItem {
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
                             PC3.Label {
-                                visible: Plasmoid.configuration.showFs
-                                    || Plasmoid.configuration.showPhysical
+                                visible: Plasmoid.configuration.showFs || Plasmoid.configuration.showPhysical
                                 text: {
                                     var a = Plasmoid.configuration.showFs       ? fs       : ""
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
@@ -371,22 +358,28 @@ PlasmoidItem {
                                 font.pixelSize: root.fontPx(13)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
-                            // % used — ABOVE the progress bar
                             PC3.Label {
                                 Layout.alignment: Qt.AlignRight
                                 text: used + "% " + root.tr2("занято", "used")
                                 color: view.labelColor; font.pixelSize: root.fontPx(13)
                             }
-                            QQC2.ProgressBar {
+                            // ProgressBar wrapped in Item to enforce height
+                            Item {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: Plasmoid.configuration.progressHeight
-                                from: 0; to: 100; value: used
-                                palette.highlight:
-                                    used >= Plasmoid.configuration.criticalPercent
-                                        ? Kirigami.Theme.negativeTextColor
-                                        : used >= Plasmoid.configuration.warningPercent
-                                            ? Kirigami.Theme.neutralTextColor
-                                            : Kirigami.Theme.highlightColor
+                                Layout.preferredHeight: Math.max(4, Plasmoid.configuration.progressHeight)
+                                clip: true
+                                QQC2.ProgressBar {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    from: 0; to: 100; value: used
+                                    palette.highlight:
+                                        used >= Plasmoid.configuration.criticalPercent
+                                            ? Kirigami.Theme.negativeTextColor
+                                            : used >= Plasmoid.configuration.warningPercent
+                                                ? Kirigami.Theme.neutralTextColor
+                                                : Kirigami.Theme.highlightColor
+                                }
                             }
                         }
                     }
