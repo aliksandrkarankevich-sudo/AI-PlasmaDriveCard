@@ -1,7 +1,7 @@
 # Drive Cards
 
 ![Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)
-![Version](https://img.shields.io/badge/version-0.95.0--beta2-orange)
+![Version](https://img.shields.io/badge/version-0.95.0--beta1-orange)
 ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-green)
 
 Небольшой полупрозрачный виджет дисков для KDE Plasma 6 и CachyOS. Показывает смонтированные локальные разделы, свободное место, файловую систему и краткое имя физического накопителя.
@@ -54,10 +54,10 @@ kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
 ```bash
 git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-./scripts/install.sh
+bash scripts/install.sh
 ```
 
-### Способ 4 — Через Git (бета-версия)
+### Способ 4 — Через Git (бета-ветка)
 
 Для тестирования последних изменений до официального релиза:
 
@@ -65,7 +65,7 @@ cd AI-PlasmaDriveCard
 git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
   https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-./scripts/install.sh
+bash scripts/install.sh
 ```
 
 > ⚠️ Бета-ветка может содержать нестабильный код. Перед установкой сохраните текущую версию.
@@ -77,13 +77,13 @@ cd AI-PlasmaDriveCard
 ```bash
 cd AI-PlasmaDriveCard
 git pull
-./scripts/install.sh
+bash scripts/install.sh
 ```
 
 ## Удаление
 
 ```bash
-./scripts/uninstall.sh
+bash scripts/uninstall.sh
 ```
 
 Либо вручную:
@@ -95,8 +95,8 @@ kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 ## Сборка и проверка
 
 ```bash
-./scripts/check.sh
-./scripts/build.sh
+bash scripts/check.sh
+bash scripts/build.sh
 ```
 
 Готовый пакет появится в `dist/`.
@@ -115,7 +115,7 @@ journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
 
 ## Статус
 
-0.95.0-beta2 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
+0.95.0-beta1 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
 
 ## Лицензия
 
