@@ -129,7 +129,6 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
-        fitTimer.restart()
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -155,7 +154,6 @@ PlasmoidItem {
         }
         previousIo = current
     }
-    // Update icon for all rows when iconStyle changes without waiting for next scan
     function refreshIcons() {
         for (var i = 0; i < drives.count; ++i) {
             var row = drives.get(i)
@@ -169,6 +167,7 @@ PlasmoidItem {
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
+    // autoFit: Layout bindings on PlasmoidItem react to wantedHeight automatically
     Layout.minimumWidth: 360
     Layout.preferredWidth: 470
     Layout.minimumHeight: Plasmoid.configuration.autoFit ? wantedHeight : 220
@@ -194,9 +193,8 @@ PlasmoidItem {
         }
     }
 
-    // Main scan timer — no triggeredOnStart, first scan via Component.onCompleted
+    // Main scan timer — first scan via Component.onCompleted (Qt.callLater)
     Timer {
-        id: mainTimer
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat: true; running: true
         onTriggered: root.refresh(0)
@@ -211,33 +209,14 @@ PlasmoidItem {
 
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
-    Timer {
-        id: fitTimer; interval: 150; repeat: false
-        onTriggered: {
-            if (!Plasmoid.configuration.autoFit) return
-            var h = root.wantedHeight
-            root.Layout.minimumHeight = h
-            root.Layout.preferredHeight = h
-            root.Layout.maximumHeight = h
-            root.height = h
-            // also update fullRepresentation layout
-            if (view) {
-                view.Layout.minimumHeight = h
-                view.Layout.preferredHeight = h
-                view.Layout.maximumHeight = h
-                view.implicitHeight = h
-            }
-        }
-    }
-
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()    { root.refresh(0) }
         function onShowBootChanged()    { root.refresh(0) }
         function onIconStyleChanged()   { root.refreshIcons() }
-        function onRowHeightChanged()   { fitTimer.restart() }
-        function onMaxHeightChanged()   { fitTimer.restart() }
-        function onAutoFitChanged()     { fitTimer.restart() }
+        function onRowHeightChanged()   { /* wantedHeight binding auto-updates */ }
+        function onMaxHeightChanged()   { /* wantedHeight binding auto-updates */ }
+        function onAutoFitChanged()     { /* Layout bindings auto-update */ }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
@@ -245,7 +224,8 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: view
         implicitWidth: 470
-        implicitHeight: root.wantedHeight
+        // implicitHeight tracks wantedHeight reactively — no fitTimer needed
+        implicitHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 420
         Layout.minimumWidth: 360
         Layout.preferredWidth: 470
         Layout.minimumHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 220
@@ -274,7 +254,6 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing: 4
 
-            // Header
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
@@ -294,7 +273,6 @@ PlasmoidItem {
                 }
             }
 
-            // Drive list
             ListView {
                 id: list
                 Layout.fillWidth: true
@@ -351,7 +329,6 @@ PlasmoidItem {
                         anchors.rightMargin: 8
                         spacing: 14
 
-                        // Drive icon + activity dot
                         Item {
                             Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
@@ -365,19 +342,16 @@ PlasmoidItem {
                             }
                         }
 
-                        // Labels + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
                             spacing: 2
 
-                            // Drive name
                             PC3.Label {
                                 text: title; color: view.labelColor
                                 font.bold: true; font.pixelSize: root.fontPx(18)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
-                            // Free / total
                             PC3.Label {
                                 text: root.formatBytes(available) + " "
                                     + root.tr2("свободно из", "free of") + " "
@@ -385,7 +359,6 @@ PlasmoidItem {
                                 color: view.labelColor; font.pixelSize: root.fontPx(16)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
-                            // FS / physical drive
                             PC3.Label {
                                 visible: Plasmoid.configuration.showFs
                                     || Plasmoid.configuration.showPhysical
@@ -398,13 +371,12 @@ PlasmoidItem {
                                 font.pixelSize: root.fontPx(13)
                                 elide: Text.ElideRight; Layout.fillWidth: true
                             }
-                            // % used — now ABOVE the progress bar
+                            // % used — ABOVE the progress bar
                             PC3.Label {
                                 Layout.alignment: Qt.AlignRight
                                 text: used + "% " + root.tr2("занято", "used")
                                 color: view.labelColor; font.pixelSize: root.fontPx(13)
                             }
-                            // Progress bar
                             QQC2.ProgressBar {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: Plasmoid.configuration.progressHeight
@@ -420,7 +392,6 @@ PlasmoidItem {
                     }
                 }
 
-                // Empty state
                 PC3.Label {
                     anchors.centerIn: parent
                     visible: drives.count === 0
