@@ -10,8 +10,6 @@ import org.kde.kirigami as Kirigami
 PlasmoidItem {
     id: root
 
-    Plasmoid.preferredRepresentation: Plasmoid.fullRepresentation
-
     readonly property bool ru: Plasmoid.configuration.language !== "en"
     readonly property int pad: Plasmoid.configuration.contentPadding
     readonly property int rowH: Plasmoid.configuration.rowHeight
@@ -184,8 +182,6 @@ PlasmoidItem {
     readonly property string udevWatchCommand: "/bin/sh -c \"" + udevWatchScript + "\""
     readonly property string udevWatchScript: "LC_ALL=C stdbuf -oL udevadm monitor --udev --subsystem-match=block --property 2>/dev/null "
         + "| grep -m1 -E '^ACTION=(add|remove|change)$'"
-
-    Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
     Layout.minimumWidth: 360
     Layout.preferredWidth: 470
@@ -388,7 +384,7 @@ PlasmoidItem {
                                 text: {
                                     var a = Plasmoid.configuration.showFs      ? fs       : ""
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
-                                    return (a && b) ? (a + "  \u2022  " + b) : (a + b)
+                                    return (a && b) ? (a + "  •  " + b) : (a + b)
                                 }
                                 color: view.labelColor; opacity: 0.72
                                 font.pixelSize: root.fontPx(13)
