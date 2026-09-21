@@ -26,8 +26,6 @@ PlasmoidItem {
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
         if (!target) return
-        // Ensure trailing slash so Dolphin opens the directory itself,
-        // not the parent (important for mount-point roots like "/").
         var url = target.endsWith("/") ? target : target + "/"
         Qt.openUrlExternally("file://" + encodeURI(url))
     }
@@ -122,7 +120,7 @@ PlasmoidItem {
                 title: label, target: target, source: source,
                 fs: prettyFs(fs.fstype), physical: physical,
                 total: size, available: available, used: used,
-                icon: displayIcon(target, physical), kname: basename(source), active: false
+                driveIcon: displayIcon(target, physical), kname: basename(source), active: false
             })
             seen[source] = true
         }
@@ -264,7 +262,6 @@ PlasmoidItem {
         readonly property color labelColor: Qt.rgba(textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
 
-        // ── Background with four-sided edge fade ─────────────────────────────
         EdgeFadeBackground {
             anchors.fill: parent
             baseColor:   view.backgroundBase
@@ -280,7 +277,6 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing: 4
 
-            // ── Header ───────────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
@@ -300,7 +296,6 @@ PlasmoidItem {
                 }
             }
 
-            // ── Drive list ───────────────────────────────────────────────────
             ListView {
                 id: list
                 Layout.fillWidth: true
@@ -314,9 +309,6 @@ PlasmoidItem {
                         : QQC2.ScrollBar.AlwaysOff
                 }
 
-                // ── Row delegate ─────────────────────────────────────────────
-                // The whole row is one ItemDelegate — clicking anywhere on it
-                // opens the drive in the file manager.  No separate button.
                 delegate: QQC2.ItemDelegate {
                     required property string title
                     required property string target
@@ -326,27 +318,22 @@ PlasmoidItem {
                     required property double total
                     required property double available
                     required property int    used
-                    required property string icon
+                    required property string driveIcon
                     required property string kname
                     required property bool   active
 
                     width:  list.width - (list.contentHeight > list.height ? 10 : 0)
                     height: root.rowH
 
-                    // Remove all built-in padding so our RowLayout fills exactly
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
 
-                    // Open the drive when the row is clicked or activated
-                    // via keyboard (Enter / Space).
                     onClicked: root.openTarget(target)
 
-                    // Tooltip shows device node and mount point
                     QQC2.ToolTip.visible: hovered
                     QQC2.ToolTip.text: source + "\n" + target
                     QQC2.ToolTip.delay: 600
 
-                    // Subtle highlight that fades in/out on hover
                     background: Rectangle {
                         color: parent.hovered
                             ? Qt.rgba(Kirigami.Theme.highlightColor.r,
@@ -365,11 +352,10 @@ PlasmoidItem {
                         anchors.rightMargin: 8
                         spacing: 14
 
-                        // Drive icon + activity dot
                         Item {
                             Layout.preferredWidth: Math.min(64, root.rowH - 30)
                             Layout.preferredHeight: Layout.preferredWidth
-                            Kirigami.Icon { anchors.fill: parent; source: icon }
+                            Kirigami.Icon { anchors.fill: parent; source: driveIcon }
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
                                 width: 12; height: 12; radius: 6
@@ -379,7 +365,6 @@ PlasmoidItem {
                             }
                         }
 
-                        // Labels + progress bar
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
@@ -403,7 +388,7 @@ PlasmoidItem {
                                 text: {
                                     var a = Plasmoid.configuration.showFs      ? fs       : ""
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
-                                    return (a && b) ? (a + "  •  " + b) : (a + b)
+                                    return (a && b) ? (a + "  \u2022  " + b) : (a + b)
                                 }
                                 color: view.labelColor; opacity: 0.72
                                 font.pixelSize: root.fontPx(13)
@@ -429,12 +414,11 @@ PlasmoidItem {
                     }
                 }
 
-                // Empty-state label
                 PC3.Label {
                     anchors.centerIn: parent
                     visible: drives.count === 0
                     text: root.scanRunning
-                        ? root.tr2("Обновление…", "Refreshing…")
+                        ? root.tr2("Обновление...", "Refreshing...")
                         : root.tr2("Доступные диски не найдены", "No accessible drives found")
                     color: view.labelColor
                     opacity: 0.75
