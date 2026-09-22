@@ -172,8 +172,9 @@ PlasmoidItem {
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
-    // autoFit: lock all three Layout heights to wantedHeight so Plasma Desktop resizes.
-    // No explicit width/height on PlasmoidItem — let Plasma manage geometry.
+    // autoFit: all sizing lives here on PlasmoidItem only.
+    // fullRepresentation must NOT duplicate these hints — Plasma 6 reads
+    // Layout hints exclusively from PlasmoidItem for desktop widget geometry.
     Layout.minimumWidth:   360
     Layout.preferredWidth: 470
     Layout.minimumHeight:  Plasmoid.configuration.autoFit ? wantedHeight : 220
@@ -223,14 +224,11 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: view
 
-        implicitWidth:  470
-        implicitHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 420
-
-        Layout.minimumWidth:   360
-        Layout.preferredWidth: 470
-        Layout.minimumHeight:  Plasmoid.configuration.autoFit ? root.wantedHeight : 220
-        Layout.preferredHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : 420
-        Layout.maximumHeight:  Plasmoid.configuration.autoFit ? root.wantedHeight : 16777215
+        // implicitWidth gives the panel applet a natural size hint.
+        // implicitHeight is intentionally omitted: height is driven by
+        // the Layout hints on PlasmoidItem above, and anchors.fill on
+        // child items keeps everything in sync automatically.
+        implicitWidth: 470
 
         readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
             ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
