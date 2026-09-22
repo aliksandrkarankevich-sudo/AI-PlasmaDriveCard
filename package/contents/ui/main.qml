@@ -20,60 +20,7 @@ PlasmoidItem {
     property bool scanRunning: false
     property bool activityRunning: false
     property var previousIo: ({})
-
-    // ── autoFit resize helpers ───────────────────────────────────────────────
-    // startupDone gates the initial setPreferredSize call so we don't race
-    // with Plasmashell geometry initialization.
-    property bool startupDone: false
-
-    function applyPreferredSize() {
-        if (!startupDone) return
-        if (!Plasmoid.configuration.autoFit) return
-        if (typeof Plasmoid.setPreferredSize !== "function") return
-        Plasmoid.setPreferredSize(470, wantedHeight)
-    }
-
-    // Debounce: coalesce rapid wantedHeight changes into one resize call.
-    Timer {
-        id: sizeDebounce
-        interval: 500
-        repeat: false
-        onTriggered: root.applyPreferredSize()
-    }
-
-    onWantedHeightChanged: {
-        if (startupDone && Plasmoid.configuration.autoFit)
-            sizeDebounce.restart()
-    }
-
-    // Reset size when autoFit is toggled off.
-    Connections {
-        target: Plasmoid.configuration
-        function onAutoFitChanged() {
-            if (!Plasmoid.configuration.autoFit) {
-                if (typeof Plasmoid.setPreferredSize === "function")
-                    Plasmoid.setPreferredSize(470, 420)
-            } else {
-                // autoFit just turned on — apply immediately (startup already done)
-                root.applyPreferredSize()
-            }
-        }
-        function onShowRootChanged()  { root.refresh(0) }
-        function onShowBootChanged()  { root.refresh(0) }
-        function onIconStyleChanged() { root.refreshIcons() }
-    }
-
-    // ── Startup delay (10 s) ─────────────────────────────────────────────────
-    Timer {
-        id: startupDelay
-        interval: 10000
-        repeat: false
-        onTriggered: {
-            root.startupDone = true
-            // Apply size now that Plasmashell geometry is stable.
-            root.applyPreferredSize()
-        }
-    }
+    property int lastDiskCount: -1
 
     // ── Functions ────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
@@ -227,22 +174,17 @@ PlasmoidItem {
         + "printf '\\n__DC_LSBLK__\\n'; "
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
+    readonly property string hotplugCommand:  "ls /dev/disk/by-id/ 2>/dev/null | wc -l"
 
-    // UDisks2 hotplug: monitor D-Bus for InterfacesAdded / InterfacesRemoved
-    // on the org.freedesktop.UDisks2 bus. Any such signal means a block device
-    // appeared or disappeared — trigger a debounced refresh after 1.2 s so the
-    // kernel has time to finish mounting before findmnt is called.
-    readonly property string udisksCommand:
-        "dbus-monitor --system \"type='signal'," +
-        "sender='org.freedesktop.UDisks2'," +
-        "interface='org.freedesktop.DBus.ObjectManager'\" 2>/dev/null"
-
-    // ── Layout hints (authoritative — fullRepresentation must NOT duplicate) ──
-    Layout.minimumWidth:   360
-    Layout.preferredWidth: 470
-    Layout.minimumHeight:  Plasmoid.configuration.autoFit ? wantedHeight : 220
+    // ── Layout hints ─────────────────────────────────────────────────────────
+    // autoFit: all three hints track wantedHeight so Plasma resizes the widget
+    // in both directions automatically whenever drives.count changes.
+    // autoFit off: static values; user can resize manually.
+    Layout.minimumWidth:    360
+    Layout.preferredWidth:  470
+    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 220
     Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : 420
-    Layout.maximumHeight:  Plasmoid.configuration.autoFit ? wantedHeight : 16777215
+    Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
 
     ListModel { id: drives }
 
@@ -260,58 +202,54 @@ PlasmoidItem {
                 disconnectSource(sourceName)
                 root.activityRunning = false
                 root.applyActivity(data["stdout"] || "")
+            } else if (sourceName === root.hotplugCommand) {
+                disconnectSource(sourceName)
+                var n = parseInt((data["stdout"] || "0").trim()) || 0
+                if (root.lastDiskCount >= 0 && n !== root.lastDiskCount)
+                    root.refresh(0)
+                root.lastDiskCount = n
             }
         }
     }
 
-    // ── UDisks2 hotplug watcher ───────────────────────────────────────────────
-    // dbus-monitor runs continuously and emits stdout lines whenever UDisks2
-    // fires InterfacesAdded or InterfacesRemoved. We watch for those keywords
-    // and schedule a refresh. The source is connected once after startupDelay
-    // fires so we don't react to boot-time enumeration noise.
-    Plasma5Support.DataSource {
-        id: udisksWatcher
-        engine: "executable"
-        onNewData: function(sourceName, data) {
-            var out = (data["stdout"] || "") + (data["stderr"] || "")
-            if (out.indexOf("InterfacesAdded") >= 0 ||
-                out.indexOf("InterfacesRemoved") >= 0) {
-                root.refresh(1200)
-            }
-        }
-    }
-
-    // ── Periodic timers ──────────────────────────────────────────────────────
+    // ── Timers ───────────────────────────────────────────────────────────────
+    // Periodic full scan
     Timer {
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat: true; running: true
         onTriggered: root.refresh(0)
     }
+    // Activity indicator
     Timer {
         interval: Math.max(1, Plasmoid.configuration.activityInterval) * 1000
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
+    // Hotplug poll: count /dev/disk/by-id entries every 3 s.
+    // Short-lived command — safe for executable engine.
+    Timer {
+        id: hotplugPoll
+        interval: 3000
+        repeat: true; running: true; triggeredOnStart: true
+        onTriggered: executable.connectSource(root.hotplugCommand)
+    }
+    // Buffer for hotplug-triggered refresh
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
-    // ── Startup sequence ─────────────────────────────────────────────────────
-    Component.onCompleted: {
-        Qt.callLater(function() { root.refresh(0) })
-        startupDelay.start()
+    // ── Config watchers ──────────────────────────────────────────────────────
+    Connections {
+        target: Plasmoid.configuration
+        function onShowRootChanged()  { root.refresh(0) }
+        function onShowBootChanged()  { root.refresh(0) }
+        function onIconStyleChanged() { root.refreshIcons() }
     }
 
-    // startupDone → connect UDisks2 watcher (avoids boot-time noise)
-    onStartupDoneChanged: {
-        if (startupDone)
-            udisksWatcher.connectSource(root.udisksCommand)
-    }
+    // ── Startup ──────────────────────────────────────────────────────────────
+    Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
+    // ── Full representation ──────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
-
-        // implicitWidth gives the panel applet a natural size hint.
-        // implicitHeight intentionally omitted: driven by PlasmoidItem Layout
-        // hints above; anchors.fill keeps children in sync automatically.
         implicitWidth: 470
 
         readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
