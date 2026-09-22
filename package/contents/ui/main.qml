@@ -166,10 +166,6 @@ PlasmoidItem {
             drives.setProperty(i, "driveIcon", displayIcon(row.target, row.physical))
         }
     }
-    function fitNow() {
-        if (typeof Plasmoid.setPreferredSize === "function")
-            Plasmoid.setPreferredSize(470, wantedHeight)
-    }
 
     // ── Commands ─────────────────────────────────────────────────────────────
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
@@ -224,9 +220,11 @@ PlasmoidItem {
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
+    // Hotplug poll: 1 s interval keeps USB appear latency under ~1 s.
+    // ls /dev/disk/by-id/ exits immediately — safe for executable engine.
     Timer {
         id: hotplugPoll
-        interval: 3000
+        interval: 1000
         repeat: true; running: true; triggeredOnStart: true
         onTriggered: executable.connectSource(root.hotplugCommand)
     }
@@ -270,11 +268,9 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing: 4
 
-            // ── Header row ─────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
-
                 Kirigami.Icon {
                     source: "drive-harddisk"
                     Layout.preferredWidth: 22; Layout.preferredHeight: 22
@@ -289,30 +285,8 @@ PlasmoidItem {
                     color: view.labelColor; opacity: 0.72
                     font.pixelSize: root.fontPx(13)
                 }
-
-                // Fit button: visible only when autoFit enabled.
-                // Calls setPreferredSize to snap the widget frame to
-                // wantedHeight regardless of what Plasma saved last.
-                QQC2.ToolButton {
-                    visible: Plasmoid.configuration.autoFit
-                    icon.name: "zoom-fit-best"
-                    Layout.preferredWidth: 24
-                    Layout.preferredHeight: 24
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: root.tr2(
-                        "Подогнать размер под содержимое",
-                        "Fit size to content")
-                    QQC2.ToolTip.delay: 600
-                    onClicked: {
-                        root.refresh(0)
-                        // setPreferredSize after a short delay so rebuild()
-                        // has time to update drives.count first.
-                        fitDelayTimer.restart()
-                    }
-                }
             }
 
-            // ── Drive list ────────────────────────────────────────────────
             ListView {
                 id: list
                 Layout.fillWidth: true
@@ -443,15 +417,6 @@ PlasmoidItem {
                     font.pixelSize: root.fontPx(15)
                 }
             }
-        }
-
-        // Timer lives inside fullRepresentation so it has access to
-        // wantedHeight at the moment it fires (after rebuild completes).
-        Timer {
-            id: fitDelayTimer
-            interval: 800
-            repeat: false
-            onTriggered: root.fitNow()
         }
     }
 }
