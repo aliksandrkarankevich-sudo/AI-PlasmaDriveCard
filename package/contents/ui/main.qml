@@ -19,8 +19,9 @@ PlasmoidItem {
         pad * 2 + 38 + Math.max(1, drives.count) * rowH))
     property bool scanRunning: false
     property bool activityRunning: false
+    property bool pendingRefresh: false
     property var previousIo: ({})
-    property int lastDiskCount: -1
+    property int lastMountCount: -1
 
     // ── Functions ────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
@@ -134,9 +135,11 @@ PlasmoidItem {
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
     }
+    // pendingRefresh: if a scan is already running when hotplug fires,
+    // set the flag and start a new scan as soon as the current one ends.
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
-        if (scanRunning) return
+        if (scanRunning) { pendingRefresh = true; return }
         scanRunning = true
         executable.connectSource(scanCommand)
     }
@@ -174,7 +177,9 @@ PlasmoidItem {
         + "printf '\\n__DC_LSBLK__\\n'; "
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
-    readonly property string hotplugCommand:  "ls /dev/disk/by-id/ 2>/dev/null | wc -l"
+    // Count mounted real filesystems — fires AFTER the kernel finishes
+    // mounting, so findmnt in the main scan will already see the new drive.
+    readonly property string hotplugCommand: "findmnt --real -n -o TARGET 2>/dev/null | wc -l"
 
     // ── Layout hints ─────────────────────────────────────────────────────────
     Layout.minimumWidth:    360
@@ -185,7 +190,7 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Main data source ────────────────────────────────────────────────────────
+    // ── Main data source ──────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -195,6 +200,12 @@ PlasmoidItem {
                 root.scanRunning = false
                 var output = data["stdout"] || ""
                 if (output.length) root.rebuild(output)
+                // If a hotplug event arrived while scan was running,
+                // start another scan immediately so nothing is missed.
+                if (root.pendingRefresh) {
+                    root.pendingRefresh = false
+                    root.refresh(0)
+                }
             } else if (sourceName === root.activityCommand) {
                 disconnectSource(sourceName)
                 root.activityRunning = false
@@ -202,14 +213,14 @@ PlasmoidItem {
             } else if (sourceName === root.hotplugCommand) {
                 disconnectSource(sourceName)
                 var n = parseInt((data["stdout"] || "0").trim()) || 0
-                if (root.lastDiskCount >= 0 && n !== root.lastDiskCount)
+                if (root.lastMountCount >= 0 && n !== root.lastMountCount)
                     root.refresh(0)
-                root.lastDiskCount = n
+                root.lastMountCount = n
             }
         }
     }
 
-    // ── Timers ───────────────────────────────────────────────────────────────
+    // ── Timers ────────────────────────────────────────────────────────────────
     Timer {
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat: true; running: true
@@ -220,8 +231,8 @@ PlasmoidItem {
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
-    // Hotplug poll: 1 s interval keeps USB appear latency under ~1 s.
-    // ls /dev/disk/by-id/ exits immediately — safe for executable engine.
+    // Poll mounted filesystems every 1 s. Uses findmnt --real so the
+    // counter changes only when a mount point actually appears/disappears.
     Timer {
         id: hotplugPoll
         interval: 1000
@@ -230,7 +241,7 @@ PlasmoidItem {
     }
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
-    // ── Config watchers ──────────────────────────────────────────────────────
+    // ── Config watchers ───────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()  { root.refresh(0) }
@@ -240,7 +251,7 @@ PlasmoidItem {
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ──────────────────────────────────────────────────
+    // ── Full representation ───────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
         implicitWidth: 470
