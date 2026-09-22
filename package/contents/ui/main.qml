@@ -166,6 +166,10 @@ PlasmoidItem {
             drives.setProperty(i, "driveIcon", displayIcon(row.target, row.physical))
         }
     }
+    function fitNow() {
+        if (typeof Plasmoid.setPreferredSize === "function")
+            Plasmoid.setPreferredSize(470, wantedHeight)
+    }
 
     // ── Commands ─────────────────────────────────────────────────────────────
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
@@ -177,9 +181,6 @@ PlasmoidItem {
     readonly property string hotplugCommand:  "ls /dev/disk/by-id/ 2>/dev/null | wc -l"
 
     // ── Layout hints ─────────────────────────────────────────────────────────
-    // autoFit: all three hints track wantedHeight so Plasma resizes the widget
-    // in both directions automatically whenever drives.count changes.
-    // autoFit off: static values; user can resize manually.
     Layout.minimumWidth:    360
     Layout.preferredWidth:  470
     Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 220
@@ -188,7 +189,7 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Main data source (scan + activity) ───────────────────────────────────
+    // ── Main data source ────────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -213,27 +214,22 @@ PlasmoidItem {
     }
 
     // ── Timers ───────────────────────────────────────────────────────────────
-    // Periodic full scan
     Timer {
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat: true; running: true
         onTriggered: root.refresh(0)
     }
-    // Activity indicator
     Timer {
         interval: Math.max(1, Plasmoid.configuration.activityInterval) * 1000
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
-    // Hotplug poll: count /dev/disk/by-id entries every 3 s.
-    // Short-lived command — safe for executable engine.
     Timer {
         id: hotplugPoll
         interval: 3000
         repeat: true; running: true; triggeredOnStart: true
         onTriggered: executable.connectSource(root.hotplugCommand)
     }
-    // Buffer for hotplug-triggered refresh
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
     // ── Config watchers ──────────────────────────────────────────────────────
@@ -244,7 +240,6 @@ PlasmoidItem {
         function onIconStyleChanged() { root.refreshIcons() }
     }
 
-    // ── Startup ──────────────────────────────────────────────────────────────
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
     // ── Full representation ──────────────────────────────────────────────────
@@ -275,9 +270,11 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing: 4
 
+            // ── Header row ─────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 30
+
                 Kirigami.Icon {
                     source: "drive-harddisk"
                     Layout.preferredWidth: 22; Layout.preferredHeight: 22
@@ -292,8 +289,30 @@ PlasmoidItem {
                     color: view.labelColor; opacity: 0.72
                     font.pixelSize: root.fontPx(13)
                 }
+
+                // Fit button: visible only when autoFit enabled.
+                // Calls setPreferredSize to snap the widget frame to
+                // wantedHeight regardless of what Plasma saved last.
+                QQC2.ToolButton {
+                    visible: Plasmoid.configuration.autoFit
+                    icon.name: "zoom-fit-best"
+                    Layout.preferredWidth: 24
+                    Layout.preferredHeight: 24
+                    QQC2.ToolTip.visible: hovered
+                    QQC2.ToolTip.text: root.tr2(
+                        "Подогнать размер под содержимое",
+                        "Fit size to content")
+                    QQC2.ToolTip.delay: 600
+                    onClicked: {
+                        root.refresh(0)
+                        // setPreferredSize after a short delay so rebuild()
+                        // has time to update drives.count first.
+                        fitDelayTimer.restart()
+                    }
+                }
             }
 
+            // ── Drive list ────────────────────────────────────────────────
             ListView {
                 id: list
                 Layout.fillWidth: true
@@ -424,6 +443,15 @@ PlasmoidItem {
                     font.pixelSize: root.fontPx(15)
                 }
             }
+        }
+
+        // Timer lives inside fullRepresentation so it has access to
+        // wantedHeight at the moment it fires (after rebuild completes).
+        Timer {
+            id: fitDelayTimer
+            interval: 800
+            repeat: false
+            onTriggered: root.fitNow()
         }
     }
 }
