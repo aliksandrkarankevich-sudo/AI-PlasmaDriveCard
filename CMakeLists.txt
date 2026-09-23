@@ -10,8 +10,9 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
-# KConfig нужен как транзитивная зависимость Plasma::Plasma
-find_package(KF6 REQUIRED COMPONENTS CoreAddons Solid KConfig)
+# Config (а не KConfig) — именно так называется компонент в ECM
+# (/usr/lib/cmake/KF6Config/KF6ConfigConfig.cmake)
+find_package(KF6 REQUIRED COMPONENTS CoreAddons Solid Config)
 
 # Plasma живёт в своём cmake-пространстве (libplasma → /usr/lib/cmake/Plasma/)
 find_package(Plasma REQUIRED)
@@ -28,7 +29,6 @@ target_link_libraries(io.github.cachyos.drivecard
     KF6::Solid
 )
 
-# Абсолютный путь к metadata.json — относительный ломается при сборке в build/
 target_compile_definitions(io.github.cachyos.drivecard PRIVATE
     PLUGIN_METADATA_FILE="${CMAKE_SOURCE_DIR}/package/metadata.json"
 )
