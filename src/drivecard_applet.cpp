@@ -4,11 +4,13 @@
 #include <Solid/Device>
 #include <Solid/StorageAccess>
 
-K_PLUGIN_CLASS_WITH_JSON(DriveCardApplet, "../package/metadata.json")
+// Путь передаётся через -DPLUGIN_METADATA_FILE из CMakeLists.txt
+// чтобы он был абсолютным и не зависел от рабочей директории сборки
+K_PLUGIN_CLASS_WITH_JSON(DriveCardApplet, PLUGIN_METADATA_FILE)
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Конструктор: только базовая инициализация, без Solid.
-// Shell может вызвать конструктор до того как D-Bus и UDisks2 готовы.
+// Конструктор: только инициализация базового класса.
+// Shell может вызвать конструктор до готовности D-Bus/UDisks2.
 // ─────────────────────────────────────────────────────────────────────────────
 DriveCardApplet::DriveCardApplet(QObject *parent,
                                  const KPluginMetaData &data,
@@ -18,18 +20,18 @@ DriveCardApplet::DriveCardApplet(QObject *parent,
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// init() — Shell вызывает этот метод после полной загрузки рабочего стола.
-// Здесь безопасно подписываться на Solid и запускать таймеры.
+// init() — вызывается Shell после полной загрузки рабочего стола.
+// Здесь безопасно подписываться на Solid и создавать таймеры.
 // ─────────────────────────────────────────────────────────────────────────────
 void DriveCardApplet::init()
 {
     Plasma::Applet::init();
+    m_initialized = true;
 
-    // Инициализируем debounce-таймер один раз здесь
     m_debounceTimer = new QTimer(this);
     m_debounceTimer->setSingleShot(true);
     m_debounceTimer->setInterval(kDebounceMs);
-    // Когда таймер срабатывает — сообщаем QML что нужен reload
+    // По истечении debounce — сигнал QML: нужен reload
     connect(m_debounceTimer, &QTimer::timeout,
             this, &DriveCardApplet::deviceMounted);
 
@@ -37,7 +39,7 @@ void DriveCardApplet::init()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Подписка на Solid. Если DeviceNotifier недоступен — fallback.
+// Подписка на Solid. Если DeviceNotifier == nullptr — входим в fallback.
 // ─────────────────────────────────────────────────────────────────────────────
 void DriveCardApplet::startSolidWatcher()
 {
@@ -46,7 +48,6 @@ void DriveCardApplet::startSolidWatcher()
         enterFallbackMode();
         return;
     }
-
     connect(notifier, &Solid::DeviceNotifier::deviceAdded,
             this, &DriveCardApplet::onDeviceAdded);
     connect(notifier, &Solid::DeviceNotifier::deviceRemoved,
@@ -54,8 +55,9 @@ void DriveCardApplet::startSolidWatcher()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Fallback: Solid недоступен — имитируем hotplug таймером каждые 2 с.
-// QML увидит deviceMounted() и сделает reload как обычно.
+// Fallback: Solid недоступен — таймер каждые 2 с имитирует hotplug-опрос.
+// Таймер НЕ запускается сразу (no start) — QML сам делает первый refresh
+// через Component.onCompleted. Первый тик через 2 с — не лишний reload.
 // ─────────────────────────────────────────────────────────────────────────────
 void DriveCardApplet::enterFallbackMode()
 {
@@ -64,35 +66,41 @@ void DriveCardApplet::enterFallbackMode()
     m_fallbackTimer->setInterval(kFallbackMs);
     connect(m_fallbackTimer, &QTimer::timeout,
             this, &DriveCardApplet::deviceMounted);
-    m_fallbackTimer->start();
+    // Запуск с задержкой — даём QML завершить первый rebuild
+    QTimer::singleShot(kFallbackMs, m_fallbackTimer,
+                       qOverload<>(&QTimer::start));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Устройство появилось в системе (udev-событие).
-// Монтирование ещё не произошло — подписываемся на accessibilityChanged
-// конкретно этого устройства и ждём mounted = true.
-// QPointer защищает от dangling pointer если устройство исчезнет раньше
-// чем успеет смонтироваться (быстрое подключение/отключение).
+// Устройство появилось (udev). Монтирование ещё не произошло.
+// Подписываемся на accessibilityChanged именно этого устройства.
+//
+// ИСПРАВЛЕНО: Qt::SingleShotConnection — соединение удаляется автоматически
+// после первого срабатывания. Без этого каждое подключение USB создавало
+// новое висящее соединение (утечка).
+//
+// QPointer защищает от dangling pointer при быстром отключении устройства
+// до момента монтирования.
 // ─────────────────────────────────────────────────────────────────────────────
 void DriveCardApplet::onDeviceAdded(const QString &udi)
 {
     Solid::Device device(udi);
     auto *access = device.as<Solid::StorageAccess>();
-    if (!access) return; // не файловая система — игнорируем
+    if (!access) return;
 
     QPointer<Solid::StorageAccess> safeAccess = access;
 
     connect(access, &Solid::StorageAccess::accessibilityChanged,
             this, [this, safeAccess](bool accessible, const QString &) {
-                if (!safeAccess) return; // устройство уже удалено — безопасный выход
+                if (!safeAccess) return;
                 if (accessible)
-                    m_debounceTimer->start(); // перезапускает таймер при шторме событий
-            });
+                    m_debounceTimer->start();
+            },
+            Qt::SingleShotConnection);  // ← устраняет утечку соединений
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Устройство отключено — сообщаем QML немедленно, без ожидания.
-// Debounce здесь не нужен: отключение одно, не серия.
+// Устройство отключено — немедленный сигнал QML без debounce.
 // ─────────────────────────────────────────────────────────────────────────────
 void DriveCardApplet::onDeviceRemoved(const QString &)
 {
@@ -100,8 +108,8 @@ void DriveCardApplet::onDeviceRemoved(const QString &)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Авторазмер: QML сообщает свои текущие размеры после изменения drives.count.
-// Сохраняем в конфиг — Shell читает его при следующей отрисовке.
+// Авторазмер: QML сообщает размер после каждого изменения drives.count.
+// Сохраняем в конфиг — Shell читает при следующей отрисовке виджета.
 // ─────────────────────────────────────────────────────────────────────────────
 void DriveCardApplet::setPreferredSize(int width, int height)
 {
@@ -112,20 +120,20 @@ void DriveCardApplet::setPreferredSize(int width, int height)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Watchdog: QML вызывает reportResult(true/false) после каждого reload.
-// 5 ошибок подряд → suspended = true, QML показывает предупреждение.
-// Через 30 с автоматически пробуем восстановиться.
+// Watchdog: считает ошибки rebuild(). 5 подряд → приостановка на 30 с.
+// ИСПРАВЛЕНО: guard m_initialized — QML не может вызвать это до init().
 // ─────────────────────────────────────────────────────────────────────────────
 void DriveCardApplet::reportResult(bool ok)
 {
+    if (!m_initialized) return;  // защита от вызова до init()
+
     if (ok) {
         m_errorCount = 0;
         return;
     }
     if (m_suspended) return;
 
-    ++m_errorCount;
-    if (m_errorCount >= kMaxErrors) {
+    if (++m_errorCount >= kMaxErrors) {
         m_suspended = true;
         Q_EMIT suspendedChanged();
         QTimer::singleShot(kResumeMs, this, &DriveCardApplet::tryResume);
@@ -137,8 +145,7 @@ void DriveCardApplet::tryResume()
     m_suspended  = false;
     m_errorCount = 0;
     Q_EMIT suspendedChanged();
-    // Один пробный reload — если снова упадёт, watchdog запустится заново
-    Q_EMIT deviceMounted();
+    Q_EMIT deviceMounted(); // один пробный reload
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -8,7 +8,8 @@ include(KDEInstallDirs)
 include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick)
+# Qt::Qml и Qt::Quick не нужны — плагин не регистрирует QML-типы напрямую
+find_package(Qt6 REQUIRED COMPONENTS Core)
 find_package(KF6 REQUIRED COMPONENTS Plasma CoreAddons Solid)
 
 kcoreaddons_add_plugin(io.github.cachyos.drivecard
@@ -18,11 +19,14 @@ kcoreaddons_add_plugin(io.github.cachyos.drivecard
 
 target_link_libraries(io.github.cachyos.drivecard
     Qt::Core
-    Qt::Qml
-    Qt::Quick
     KF6::Plasma
     KF6::CoreAddons
     KF6::Solid
+)
+
+# Абсолютный путь к metadata.json — относительный ломается при сборке в build/
+target_compile_definitions(io.github.cachyos.drivecard PRIVATE
+    PLUGIN_METADATA_FILE="${CMAKE_SOURCE_DIR}/package/metadata.json"
 )
 
 plasma_install_package(package io.github.cachyos.drivecard)
