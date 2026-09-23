@@ -8,13 +8,13 @@ include(KDEInstallDirs)
 include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 
-# Qt::Qml и Qt::Quick не нужны — плагин не регистрирует QML-типы напрямую
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
+# KConfig нужен как транзитивная зависимость Plasma::Plasma
+find_package(KF6 REQUIRED COMPONENTS CoreAddons Solid KConfig)
+
 # Plasma живёт в своём cmake-пространстве (libplasma → /usr/lib/cmake/Plasma/)
-# а не в KF6-umbrella, поэтому ищем напрямую
 find_package(Plasma REQUIRED)
-find_package(KF6 REQUIRED COMPONENTS CoreAddons Solid)
 
 kcoreaddons_add_plugin(io.github.cachyos.drivecard
     SOURCES src/drivecard_applet.cpp src/drivecard_applet.h
