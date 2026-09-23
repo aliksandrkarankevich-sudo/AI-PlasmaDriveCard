@@ -24,39 +24,46 @@ PlasmoidItem {
     property bool pendingRefresh: false
     property var previousIo: ({})
 
-    // ── C++ backend ────────────────────────────────────────────────────────────────────
-    readonly property var applet: Plasmoid.nativeInterface
+    // ── C++ backend (Plasma5Support.DataEngineConsumer / nativeInterface) ──────────────
+    // nativeInterface может вернуть null на некоторых конфигурациях Plasma 6 — всегда проверяем
+    readonly property var applet: (typeof Plasmoid.nativeInterface !== "undefined") ? Plasmoid.nativeInterface : null
+    readonly property bool hasApplet: applet !== null && applet !== undefined
 
     // Держим C++ в курсе количества дисков
     Binding {
-        target: root.applet
+        target: root.hasApplet ? root.applet : null
         property: "driveCount"
         value: drives.count
+        when: root.hasApplet
     }
 
     // Когда wantedHeight меняется (drives.count уменьшился) — сразу сообщаем C++
-    // это заставляет Plasma перерассчитать высоту даже при уменьшении
     onWantedHeightChanged: {
-        if (root.applet && Plasmoid.configuration.autoFit)
+        if (root.hasApplet && Plasmoid.configuration.autoFit)
             root.applet.setPreferredSize(width, wantedHeight)
     }
 
-    // Solid hotplug: устройство смонтировано → reload
+    // Solid hotplug: устройство смонтировано / извлечено → reload
     Connections {
-        target: root.applet
+        target: root.hasApplet ? root.applet : null
+        ignoreUnknownSignals: true
         function onDeviceMounted() { root.refresh(0) }
         function onDeviceRemoved() { root.refresh(0) }
     }
 
     // Watchdog: если applet приостановлен — показываем оверлей
     Connections {
-        target: root.applet
-        function onSuspendedChanged() { suspendedOverlay.visible = root.applet.suspended }
+        target: root.hasApplet ? root.applet : null
+        ignoreUnknownSignals: true
+        function onSuspendedChanged() {
+            if (root.hasApplet)
+                suspendedOverlay.visible = root.applet.suspended
+        }
     }
 
     // Авторазмер: сообщаем C++ актуальный размер после изменения высоты
-    onHeightChanged: if (root.applet) root.applet.setPreferredSize(width, height)
-    onWidthChanged:  if (root.applet) root.applet.setPreferredSize(width, height)
+    onHeightChanged: if (root.hasApplet) root.applet.setPreferredSize(width, height)
+    onWidthChanged:  if (root.hasApplet) root.applet.setPreferredSize(width, height)
 
     // ── Functions ────────────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
@@ -116,7 +123,7 @@ PlasmoidItem {
         var marker = "__DC_LSBLK__"
         var markerIndex = output.indexOf(marker)
         if (markerIndex < 0) {
-            if (root.applet) root.applet.reportResult(false)
+            if (root.hasApplet) root.applet.reportResult(false)
             return
         }
         var findmntData
@@ -126,7 +133,7 @@ PlasmoidItem {
             lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
-            if (root.applet) root.applet.reportResult(false)
+            if (root.hasApplet) root.applet.reportResult(false)
             return
         }
         var map = ({})
@@ -173,7 +180,7 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
-        if (root.applet) root.applet.reportResult(true)
+        if (root.hasApplet) root.applet.reportResult(true)
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -221,8 +228,6 @@ PlasmoidItem {
     Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
     Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
     Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 25
-    // Важно: maximumHeight = wantedHeight при autoFit — Plasma не сможет растянуть
-    // виджет больше рассчитанной высоты
     Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
 
     ListModel { id: drives }

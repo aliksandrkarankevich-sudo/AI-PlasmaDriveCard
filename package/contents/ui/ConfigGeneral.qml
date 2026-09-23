@@ -9,6 +9,9 @@ QQC2.ScrollView {
     QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
     QQC2.ScrollBar.vertical.policy: QQC2.ScrollBar.AsNeeded
 
+    // Plasma config framework passes this to identify the page
+    property string title
+
     // Current values
     property string cfg_language
     property bool   cfg_autoFit
@@ -39,35 +42,35 @@ QQC2.ScrollView {
     property int    cfg_warningPercent
     property int    cfg_criticalPercent
 
-    // Default values — required by Plasma config framework
-    property string cfg_languageDefault:           "ru"
-    property bool   cfg_autoFitDefault:            true
-    property int    cfg_rowHeightDefault:          112
-    property int    cfg_textScaleDefault:          100
-    property int    cfg_progressHeightDefault:     8
-    property int    cfg_maxHeightDefault:          720
-    property bool   cfg_showRootDefault:           true
-    property bool   cfg_showBootDefault:           false
-    property bool   cfg_showFsDefault:             true
-    property bool   cfg_showPhysicalDefault:       true
-    property string cfg_iconStyleDefault:          "drive"
-    property bool   cfg_showActivityDefault:       true
-    property int    cfg_activityIntervalDefault:   2
-    property int    cfg_backgroundOpacityDefault:  40
+    // Default values — required by Plasma config framework ("Reset to defaults" button)
+    property string cfg_languageDefault:            "ru"
+    property bool   cfg_autoFitDefault:             true
+    property int    cfg_rowHeightDefault:           112
+    property int    cfg_textScaleDefault:           100
+    property int    cfg_progressHeightDefault:      8
+    property int    cfg_maxHeightDefault:           720
+    property bool   cfg_showRootDefault:            true
+    property bool   cfg_showBootDefault:            false
+    property bool   cfg_showFsDefault:              true
+    property bool   cfg_showPhysicalDefault:        true
+    property string cfg_iconStyleDefault:           "drive"
+    property bool   cfg_showActivityDefault:        true
+    property int    cfg_activityIntervalDefault:    2
+    property int    cfg_backgroundOpacityDefault:   40
     property string cfg_backgroundColorModeDefault: "theme"
-    property string cfg_backgroundColorDefault:    "#20242b"
-    property int    cfg_textOpacityDefault:        90
-    property string cfg_textColorModeDefault:      "theme"
-    property string cfg_textColorDefault:          "#eff0f1"
-    property bool   cfg_roundedDefault:            true
-    property int    cfg_cornerRadiusDefault:       15
-    property int    cfg_edgeOpacityDefault:        100
-    property int    cfg_edgeWidthDefault:          30
-    property int    cfg_edgeCurveDefault:          0
-    property int    cfg_contentPaddingDefault:     24
-    property int    cfg_updateIntervalDefault:     60
-    property int    cfg_warningPercentDefault:     80
-    property int    cfg_criticalPercentDefault:    90
+    property string cfg_backgroundColorDefault:     "#20242b"
+    property int    cfg_textOpacityDefault:         90
+    property string cfg_textColorModeDefault:       "theme"
+    property string cfg_textColorDefault:           "#eff0f1"
+    property bool   cfg_roundedDefault:             true
+    property int    cfg_cornerRadiusDefault:        15
+    property int    cfg_edgeOpacityDefault:         100
+    property int    cfg_edgeWidthDefault:           30
+    property int    cfg_edgeCurveDefault:           0
+    property int    cfg_contentPaddingDefault:      24
+    property int    cfg_updateIntervalDefault:      60
+    property int    cfg_warningPercentDefault:      80
+    property int    cfg_criticalPercentDefault:     90
 
     readonly property bool ru: cfg_language !== "en"
     function tr2(ruText, enText) { return ru ? ruText : enText }
