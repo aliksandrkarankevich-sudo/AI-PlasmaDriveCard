@@ -15,8 +15,10 @@ PlasmoidItem {
     readonly property bool ru: Plasmoid.configuration.language !== "en"
     readonly property int pad: Plasmoid.configuration.contentPadding
     readonly property int rowH: Plasmoid.configuration.rowHeight
-    readonly property int wantedHeight: Math.max(150, Math.min(Plasmoid.configuration.maxHeight,
-        pad * 2 + 38 + Math.max(1, drives.count) * rowH))
+    readonly property int wantedHeight: Math.max(
+        Kirigami.Units.gridUnit * 9,
+        Math.min(Plasmoid.configuration.maxHeight,
+            pad * 2 + Kirigami.Units.gridUnit * 2 + Math.max(1, drives.count) * rowH))
     property bool scanRunning: false
     property bool activityRunning: false
     property bool pendingRefresh: false
@@ -25,7 +27,7 @@ PlasmoidItem {
     // ── C++ backend ──────────────────────────────────────────────────────────
     readonly property var applet: Plasmoid.nativeInterface
 
-    // Держим C++ в курсе количества дисков (для будущего авторазмера)
+    // Держим C++ в курсе количества дисков
     Binding {
         target: root.applet
         property: "driveCount"
@@ -207,11 +209,12 @@ PlasmoidItem {
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
-    // ── Layout hints ─────────────────────────────────────────────────────────
-    Layout.minimumWidth:    360
-    Layout.preferredWidth:  470
-    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 220
-    Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : 420
+    // ── Layout hints (Kirigami.Units — корректное масштабирование HiDPI) ─────
+    // gridUnit = базовая единица темы (обычно 18px при 1x, автоматически масштабируется)
+    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22   // ~396px @ 1x
+    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29   // ~522px @ 1x
+    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
+    Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 25
     Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
 
     ListModel { id: drives }
@@ -264,7 +267,7 @@ PlasmoidItem {
     // ── Full representation ───────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
-        implicitWidth: 470
+        implicitWidth: Kirigami.Units.gridUnit * 29   // синхронно с Layout.preferredWidth
 
         readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
             ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
@@ -294,10 +297,11 @@ PlasmoidItem {
             z: 99
             Column {
                 anchors.centerIn: parent
-                spacing: 8
+                spacing: Kirigami.Units.smallSpacing
                 Kirigami.Icon {
                     source: "dialog-warning"
-                    width: 32; height: 32
+                    width:  Kirigami.Units.iconSizes.large
+                    height: Kirigami.Units.iconSizes.large
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
                 PC3.Label {
@@ -312,14 +316,15 @@ PlasmoidItem {
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: root.pad
-            spacing: 4
+            spacing: Kirigami.Units.smallSpacing
 
             RowLayout {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 30
+                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
                 Kirigami.Icon {
                     source: "drive-harddisk"
-                    Layout.preferredWidth: 22; Layout.preferredHeight: 22
+                    Layout.preferredWidth:  Kirigami.Units.iconSizes.smallMedium
+                    Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
                 }
                 PC3.Label {
                     text: root.tr2("Диски", "Drives")
@@ -359,7 +364,9 @@ PlasmoidItem {
                     required property string kname
                     required property bool   active
 
-                    width:  list.width - (list.contentHeight > list.height ? 10 : 0)
+                    // scrollbar width = Kirigami.Units.smallSpacing * 2 + 2 ≈ 10px @ 1x
+                    width:  list.width - (list.contentHeight > list.height
+                        ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
                     height: root.rowH
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
@@ -382,27 +389,34 @@ PlasmoidItem {
 
                     contentItem: RowLayout {
                         anchors.fill: parent
-                        anchors.leftMargin: 4
-                        anchors.rightMargin: 8
-                        spacing: 14
+                        anchors.leftMargin:  Kirigami.Units.smallSpacing
+                        anchors.rightMargin: Kirigami.Units.largeSpacing
+                        spacing: Kirigami.Units.largeSpacing
 
                         Item {
-                            Layout.preferredWidth: Math.min(64, root.rowH - 30)
+                            // иконка: не больше iconSizes.medium и умещается в строку
+                            Layout.preferredWidth:  Math.min(
+                                Kirigami.Units.iconSizes.medium,
+                                root.rowH - Kirigami.Units.largeSpacing * 2)
                             Layout.preferredHeight: Layout.preferredWidth
                             Kirigami.Icon { anchors.fill: parent; source: driveIcon }
+                            // индикатор активности диска
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
-                                width: 12; height: 12; radius: 6
+                                width:  Kirigami.Units.smallSpacing * 2
+                                height: Kirigami.Units.smallSpacing * 2
+                                radius: Kirigami.Units.smallSpacing
                                 anchors.right: parent.right; anchors.bottom: parent.bottom
                                 color: Kirigami.Theme.positiveTextColor
-                                border.width: 2; border.color: Kirigami.Theme.backgroundColor
+                                border.width: Math.max(1, Kirigami.Units.smallSpacing / 2)
+                                border.color: Kirigami.Theme.backgroundColor
                             }
                         }
 
                         ColumnLayout {
                             Layout.fillWidth: true
                             Layout.alignment: Qt.AlignVCenter
-                            spacing: 2
+                            spacing: Kirigami.Units.smallSpacing / 2
 
                             PC3.Label {
                                 text: title; color: view.labelColor
@@ -434,7 +448,9 @@ PlasmoidItem {
                             }
                             Item {
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: Math.max(4, Plasmoid.configuration.progressHeight)
+                                Layout.preferredHeight: Math.max(
+                                    Kirigami.Units.smallSpacing,
+                                    Plasmoid.configuration.progressHeight)
                                 clip: true
                                 QQC2.ProgressBar {
                                     anchors.left: parent.left
