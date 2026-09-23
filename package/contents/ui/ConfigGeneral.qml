@@ -9,34 +9,65 @@ QQC2.ScrollView {
     QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
     QQC2.ScrollBar.vertical.policy: QQC2.ScrollBar.AsNeeded
 
+    // Current values
     property string cfg_language
-    property bool cfg_autoFit
-    property int cfg_rowHeight
-    property int cfg_textScale
-    property int cfg_progressHeight
-    property int cfg_maxHeight
-    property bool cfg_showRoot
-    property bool cfg_showBoot
-    property bool cfg_showFs
-    property bool cfg_showPhysical
+    property bool   cfg_autoFit
+    property int    cfg_rowHeight
+    property int    cfg_textScale
+    property int    cfg_progressHeight
+    property int    cfg_maxHeight
+    property bool   cfg_showRoot
+    property bool   cfg_showBoot
+    property bool   cfg_showFs
+    property bool   cfg_showPhysical
     property string cfg_iconStyle
-    property bool cfg_showActivity
-    property int cfg_activityInterval
-    property int cfg_backgroundOpacity
+    property bool   cfg_showActivity
+    property int    cfg_activityInterval
+    property int    cfg_backgroundOpacity
     property string cfg_backgroundColorMode
     property string cfg_backgroundColor
-    property int cfg_textOpacity
+    property int    cfg_textOpacity
     property string cfg_textColorMode
     property string cfg_textColor
-    property bool cfg_rounded
-    property int cfg_cornerRadius
-    property int cfg_edgeOpacity
-    property int cfg_edgeWidth
-    property int cfg_edgeCurve
-    property int cfg_contentPadding
-    property int cfg_updateInterval
-    property int cfg_warningPercent
-    property int cfg_criticalPercent
+    property bool   cfg_rounded
+    property int    cfg_cornerRadius
+    property int    cfg_edgeOpacity
+    property int    cfg_edgeWidth
+    property int    cfg_edgeCurve
+    property int    cfg_contentPadding
+    property int    cfg_updateInterval
+    property int    cfg_warningPercent
+    property int    cfg_criticalPercent
+
+    // Default values — required by Plasma config framework
+    property string cfg_languageDefault:           "ru"
+    property bool   cfg_autoFitDefault:            true
+    property int    cfg_rowHeightDefault:          112
+    property int    cfg_textScaleDefault:          100
+    property int    cfg_progressHeightDefault:     8
+    property int    cfg_maxHeightDefault:          720
+    property bool   cfg_showRootDefault:           true
+    property bool   cfg_showBootDefault:           false
+    property bool   cfg_showFsDefault:             true
+    property bool   cfg_showPhysicalDefault:       true
+    property string cfg_iconStyleDefault:          "drive"
+    property bool   cfg_showActivityDefault:       true
+    property int    cfg_activityIntervalDefault:   2
+    property int    cfg_backgroundOpacityDefault:  40
+    property string cfg_backgroundColorModeDefault: "theme"
+    property string cfg_backgroundColorDefault:    "#20242b"
+    property int    cfg_textOpacityDefault:        90
+    property string cfg_textColorModeDefault:      "theme"
+    property string cfg_textColorDefault:          "#eff0f1"
+    property bool   cfg_roundedDefault:            true
+    property int    cfg_cornerRadiusDefault:       15
+    property int    cfg_edgeOpacityDefault:        100
+    property int    cfg_edgeWidthDefault:          30
+    property int    cfg_edgeCurveDefault:          0
+    property int    cfg_contentPaddingDefault:     24
+    property int    cfg_updateIntervalDefault:     60
+    property int    cfg_warningPercentDefault:     80
+    property int    cfg_criticalPercentDefault:    90
 
     readonly property bool ru: cfg_language !== "en"
     function tr2(ruText, enText) { return ru ? ruText : enText }
@@ -138,7 +169,6 @@ QQC2.ScrollView {
             Kirigami.FormData.label: page.tr2("Непрозрачность фона:", "Background opacity:")
             from: 0; to: 100; value: page.cfg_backgroundOpacity
             textFromValue: function(v) { return v + "%" }
-            // isNaN guard: a typo must not silently zero the background
             valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
             onValueModified: page.cfg_backgroundOpacity = value
         }
@@ -183,7 +213,6 @@ QQC2.ScrollView {
             Kirigami.FormData.label: page.tr2("Радиус:", "Radius:")
             from: 0; to: 80; value: page.cfg_cornerRadius; enabled: page.cfg_rounded
             textFromValue: function(v) { return v + " px" }
-            // isNaN guard: consistent with backgroundOpacity
             valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
             onValueModified: page.cfg_cornerRadius = value
         }
@@ -225,7 +254,6 @@ QQC2.ScrollView {
             onValueModified: page.cfg_updateInterval = value
         }
         QQC2.SpinBox {
-            // `to` is bound so the widget physically prevents warning ≥ critical
             Kirigami.FormData.label: page.tr2("Предупреждение:", "Warning:")
             from: 50; to: page.cfg_criticalPercent - 1; value: page.cfg_warningPercent
             textFromValue: function(v) { return v + "%" }
@@ -233,7 +261,6 @@ QQC2.ScrollView {
             onValueModified: page.cfg_warningPercent = value
         }
         QQC2.SpinBox {
-            // `from` is bound so the widget physically prevents critical ≤ warning
             Kirigami.FormData.label: page.tr2("Критический уровень:", "Critical:")
             from: page.cfg_warningPercent + 1; to: 100; value: page.cfg_criticalPercent
             textFromValue: function(v) { return v + "%" }
