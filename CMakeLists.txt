@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 3.16)
+project(drivecard VERSION 0.96)
+
+find_package(ECM 6.0 REQUIRED NO_MODULE)
+set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH})
+
+include(KDEInstallDirs)
+include(KDECMakeSettings)
+include(KDECompilerSettings NO_POLICY_SCOPE)
+
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick)
+find_package(KF6 REQUIRED COMPONENTS Plasma CoreAddons Solid)
+
+kcoreaddons_add_plugin(io.github.cachyos.drivecard
+    SOURCES src/drivecard_applet.cpp src/drivecard_applet.h
+    INSTALL_NAMESPACE "plasma/applets"
+)
+
+target_link_libraries(io.github.cachyos.drivecard
+    Qt::Core
+    Qt::Qml
+    Qt::Quick
+    KF6::Plasma
+    KF6::CoreAddons
+    KF6::Solid
+)
+
+plasma_install_package(package io.github.cachyos.drivecard)

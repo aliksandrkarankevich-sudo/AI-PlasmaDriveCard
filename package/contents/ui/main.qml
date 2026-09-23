@@ -21,7 +21,33 @@ PlasmoidItem {
     property bool activityRunning: false
     property bool pendingRefresh: false
     property var previousIo: ({})
-    property int lastMountCount: -1
+
+    // ── C++ backend ──────────────────────────────────────────────────────────
+    readonly property var applet: Plasmoid.nativeInterface
+
+    // Держим C++ в курсе количества дисков (для будущего авторазмера)
+    Binding {
+        target: root.applet
+        property: "driveCount"
+        value: drives.count
+    }
+
+    // Solid hotplug: устройство смонтировано → reload
+    Connections {
+        target: root.applet
+        function onDeviceMounted() { root.refresh(0) }
+        function onDeviceRemoved() { root.refresh(0) }
+    }
+
+    // Watchdog: если applet приостановлен — показываем оверлей
+    Connections {
+        target: root.applet
+        function onSuspendedChanged() { suspendedOverlay.visible = root.applet.suspended }
+    }
+
+    // Авторазмер: сообщаем C++ актуальный размер после изменения высоты
+    onHeightChanged: if (root.applet) root.applet.setPreferredSize(width, height)
+    onWidthChanged:  if (root.applet) root.applet.setPreferredSize(width, height)
 
     // ── Functions ────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
@@ -80,7 +106,10 @@ PlasmoidItem {
     function rebuild(output) {
         var marker = "__DC_LSBLK__"
         var markerIndex = output.indexOf(marker)
-        if (markerIndex < 0) return
+        if (markerIndex < 0) {
+            if (root.applet) root.applet.reportResult(false)
+            return
+        }
         var findmntData
         var lsblkData
         try {
@@ -88,6 +117,7 @@ PlasmoidItem {
             lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
+            if (root.applet) root.applet.reportResult(false)
             return
         }
         var map = ({})
@@ -134,9 +164,8 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
+        if (root.applet) root.applet.reportResult(true)
     }
-    // pendingRefresh: if a scan is already running when hotplug fires,
-    // set the flag and start a new scan as soon as the current one ends.
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
         if (scanRunning) { pendingRefresh = true; return }
@@ -177,9 +206,6 @@ PlasmoidItem {
         + "printf '\\n__DC_LSBLK__\\n'; "
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
-    // Count mounted real filesystems — fires AFTER the kernel finishes
-    // mounting, so findmnt in the main scan will already see the new drive.
-    readonly property string hotplugCommand: "findmnt --real -n -o TARGET 2>/dev/null | wc -l"
 
     // ── Layout hints ─────────────────────────────────────────────────────────
     Layout.minimumWidth:    360
@@ -200,8 +226,6 @@ PlasmoidItem {
                 root.scanRunning = false
                 var output = data["stdout"] || ""
                 if (output.length) root.rebuild(output)
-                // If a hotplug event arrived while scan was running,
-                // start another scan immediately so nothing is missed.
                 if (root.pendingRefresh) {
                     root.pendingRefresh = false
                     root.refresh(0)
@@ -210,12 +234,6 @@ PlasmoidItem {
                 disconnectSource(sourceName)
                 root.activityRunning = false
                 root.applyActivity(data["stdout"] || "")
-            } else if (sourceName === root.hotplugCommand) {
-                disconnectSource(sourceName)
-                var n = parseInt((data["stdout"] || "0").trim()) || 0
-                if (root.lastMountCount >= 0 && n !== root.lastMountCount)
-                    root.refresh(0)
-                root.lastMountCount = n
             }
         }
     }
@@ -230,14 +248,6 @@ PlasmoidItem {
         interval: Math.max(1, Plasmoid.configuration.activityInterval) * 1000
         repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
         onTriggered: root.refreshActivity()
-    }
-    // Poll mounted filesystems every 1 s. Uses findmnt --real so the
-    // counter changes only when a mount point actually appears/disappears.
-    Timer {
-        id: hotplugPoll
-        interval: 1000
-        repeat: true; running: true; triggeredOnStart: true
-        onTriggered: executable.connectSource(root.hotplugCommand)
     }
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
@@ -272,6 +282,31 @@ PlasmoidItem {
             fadeWidth:   Plasmoid.configuration.edgeWidth
             curve:       Plasmoid.configuration.edgeCurve / 100.0
             radius:      Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+        }
+
+        // Watchdog overlay — виден только если C++ приостановил виджет
+        Rectangle {
+            id: suspendedOverlay
+            anchors.fill: parent
+            visible: false
+            color: Qt.rgba(0, 0, 0, 0.55)
+            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            z: 99
+            Column {
+                anchors.centerIn: parent
+                spacing: 8
+                Kirigami.Icon {
+                    source: "dialog-warning"
+                    width: 32; height: 32
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+                PC3.Label {
+                    text: root.tr2("Виджет приостановлен\nПовтор через 30 с",
+                                   "Widget suspended\nRetrying in 30 s")
+                    color: "white"; horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: root.fontPx(14)
+                }
+            }
         }
 
         ColumnLayout {
