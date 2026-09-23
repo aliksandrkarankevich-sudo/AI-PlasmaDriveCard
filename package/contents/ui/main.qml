@@ -24,7 +24,7 @@ PlasmoidItem {
     property bool pendingRefresh: false
     property var previousIo: ({})
 
-    // ── C++ backend ──────────────────────────────────────────────────────────
+    // ── C++ backend ────────────────────────────────────────────────────────────────────
     readonly property var applet: Plasmoid.nativeInterface
 
     // Держим C++ в курсе количества дисков
@@ -32,6 +32,13 @@ PlasmoidItem {
         target: root.applet
         property: "driveCount"
         value: drives.count
+    }
+
+    // Когда wantedHeight меняется (drives.count уменьшился) — сразу сообщаем C++
+    // это заставляет Plasma перерассчитать высоту даже при уменьшении
+    onWantedHeightChanged: {
+        if (root.applet && Plasmoid.configuration.autoFit)
+            root.applet.setPreferredSize(width, wantedHeight)
     }
 
     // Solid hotplug: устройство смонтировано → reload
@@ -51,7 +58,7 @@ PlasmoidItem {
     onHeightChanged: if (root.applet) root.applet.setPreferredSize(width, height)
     onWidthChanged:  if (root.applet) root.applet.setPreferredSize(width, height)
 
-    // ── Functions ────────────────────────────────────────────────────────────
+    // ── Functions ────────────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
     function openTarget(target) {
@@ -201,7 +208,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Commands ─────────────────────────────────────────────────────────────
+    // ── Commands ────────────────────────────────────────────────────────────────────
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript:
         "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
@@ -210,16 +217,17 @@ PlasmoidItem {
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
     // ── Layout hints (Kirigami.Units — корректное масштабирование HiDPI) ─────
-    // gridUnit = базовая единица темы (обычно 18px при 1x, автоматически масштабируется)
-    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22   // ~396px @ 1x
-    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29   // ~522px @ 1x
+    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
+    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
     Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
     Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 25
+    // Важно: maximumHeight = wantedHeight при autoFit — Plasma не сможет растянуть
+    // виджет больше рассчитанной высоты
     Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
 
     ListModel { id: drives }
 
-    // ── Main data source ──────────────────────────────────────────────────────
+    // ── Main data source ──────────────────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -241,7 +249,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Timers ────────────────────────────────────────────────────────────────
+    // ── Timers ───────────────────────────────────────────────────────────────────────
     Timer {
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat: true; running: true
@@ -254,7 +262,7 @@ PlasmoidItem {
     }
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
-    // ── Config watchers ───────────────────────────────────────────────────────
+    // ── Config watchers ─────────────────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()  { root.refresh(0) }
@@ -264,10 +272,10 @@ PlasmoidItem {
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ───────────────────────────────────────────────────
+    // ── Full representation ─────────────────────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
-        implicitWidth: Kirigami.Units.gridUnit * 29   // синхронно с Layout.preferredWidth
+        implicitWidth: Kirigami.Units.gridUnit * 29
 
         readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
             ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
@@ -287,7 +295,6 @@ PlasmoidItem {
             radius:      Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
         }
 
-        // Watchdog overlay — виден только если C++ приостановил виджет
         Rectangle {
             id: suspendedOverlay
             anchors.fill: parent
@@ -364,7 +371,6 @@ PlasmoidItem {
                     required property string kname
                     required property bool   active
 
-                    // scrollbar width = Kirigami.Units.smallSpacing * 2 + 2 ≈ 10px @ 1x
                     width:  list.width - (list.contentHeight > list.height
                         ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
                     height: root.rowH
@@ -394,13 +400,11 @@ PlasmoidItem {
                         spacing: Kirigami.Units.largeSpacing
 
                         Item {
-                            // иконка: не больше iconSizes.medium и умещается в строку
                             Layout.preferredWidth:  Math.min(
                                 Kirigami.Units.iconSizes.medium,
                                 root.rowH - Kirigami.Units.largeSpacing * 2)
                             Layout.preferredHeight: Layout.preferredWidth
                             Kirigami.Icon { anchors.fill: parent; source: driveIcon }
-                            // индикатор активности диска
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
                                 width:  Kirigami.Units.smallSpacing * 2
