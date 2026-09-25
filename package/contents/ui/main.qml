@@ -16,9 +16,6 @@ PlasmoidItem {
     readonly property int  pad:  Plasmoid.configuration.contentPadding
     readonly property int  rowH: Plasmoid.configuration.rowHeight
 
-    // Желаемая высота: шапка + строки дисков, зажатая между min и maxHeight.
-    // Math.max(1, drives.count) — хотя бы одна строка когда список пуст,
-    // чтобы виджет не схлопывался до одной шапки.
     readonly property int wantedHeight: Math.max(
         Kirigami.Units.gridUnit * 9,
         Math.min(
@@ -27,6 +24,12 @@ PlasmoidItem {
                 + Math.max(1, drives.count) * rowH
         )
     )
+
+    // ── ДИАГНОСТИКА: точка 1 — меняется ли wantedHeight ─────────────────────
+    onWantedHeightChanged:
+        console.log("[DC] wantedHeight=", wantedHeight,
+                    "drives.count=", drives.count,
+                    "root.height=", root.height)
 
     property bool scanRunning:    false
     property bool activityRunning: false
@@ -38,7 +41,6 @@ PlasmoidItem {
                                           ? Plasmoid.nativeInterface : null
     readonly property bool hasApplet: applet !== null && applet !== undefined
 
-    // Сообщаем C++ количество дисков (нужно watchdog-у)
     Binding {
         target:   root.hasApplet ? root.applet : null
         property: "driveCount"
@@ -46,7 +48,6 @@ PlasmoidItem {
         when:     root.hasApplet
     }
 
-    // Solid hotplug → немедленный refresh
     Connections {
         target: root.hasApplet ? root.applet : null
         ignoreUnknownSignals: true
@@ -54,7 +55,6 @@ PlasmoidItem {
         function onDeviceRemoved() { root.refresh(0) }
     }
 
-    // Watchdog: C++ сигнализирует о приостановке
     Connections {
         target: root.hasApplet ? root.applet : null
         ignoreUnknownSignals: true
@@ -184,6 +184,9 @@ PlasmoidItem {
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
         if (root.hasApplet) root.applet.reportResult(true)
+        // ── ДИАГНОСТИКА: точка 2 — что видим сразу после rebuild ────────────
+        console.log("[DC] rebuild done: drives.count=", drives.count,
+                    "wantedHeight=", wantedHeight)
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -284,24 +287,24 @@ PlasmoidItem {
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
     // ── Full representation ───────────────────────────────────────────────────
-    // ВАЖНО: Layout.* и implicitHeight задаются ЗДЕСЬ, а не на PlasmoidItem.
-    // Plasma Desktop (AppletQuickItem) читает geometry именно из
-    // fullRepresentation в рантайме — только так работает авторазмер.
     fullRepresentation: Item {
         id: view
 
-        // implicitHeight — сигнал для Plasma: «столько мне нужно».
-        // Меняется автоматически при изменении drives.count → wantedHeight.
         implicitWidth:  Kirigami.Units.gridUnit * 29
         implicitHeight: root.wantedHeight
 
-        // Layout.* внутри fullRepresentation — читаются Shell в рантайме.
         Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
         Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
         Layout.minimumHeight:   Kirigami.Units.gridUnit * 9
         Layout.preferredHeight: root.wantedHeight
         Layout.maximumHeight:   Plasmoid.configuration.autoFit
                                     ? root.wantedHeight : 16777215
+
+        // ── ДИАГНОСТИКА: точка 3 — меняется ли физический размер view ────────
+        onHeightChanged:
+            console.log("[DC] view.height=", height,
+                        "implicitHeight=", implicitHeight,
+                        "wantedHeight=", root.wantedHeight)
 
         // ── Цвета ────────────────────────────────────────────────────────────
         readonly property color backgroundBase:
@@ -363,7 +366,6 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing: Kirigami.Units.smallSpacing
 
-            // Шапка
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -387,7 +389,6 @@ PlasmoidItem {
                 }
             }
 
-            // Список дисков
             ListView {
                 id: list
                 Layout.fillWidth:  true
@@ -528,7 +529,6 @@ PlasmoidItem {
                     }
                 }
 
-                // Заглушка при пустом списке
                 PC3.Label {
                     anchors.centerIn: parent
                     visible:        drives.count === 0
