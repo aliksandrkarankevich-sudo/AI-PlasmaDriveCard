@@ -16,16 +16,29 @@ PlasmoidItem {
     readonly property int  pad:  Plasmoid.configuration.contentPadding
     readonly property int  rowH: Plasmoid.configuration.rowHeight
 
+    // Минимальная высота одной строки с учётом текущего шрифта
+    readonly property int effectiveRowH: Math.max(
+        rowH,
+        fontPx(18) + fontPx(16) + fontPx(13) + fontPx(13)
+            + Plasmoid.configuration.progressHeight
+            + Kirigami.Units.smallSpacing * 4
+            + Kirigami.Units.largeSpacing * 2
+    )
+
+    // Высота всех строк + заголовок + паддинги + spacing между ними
     readonly property int wantedHeight: Math.max(
         Kirigami.Units.gridUnit * 9,
         Math.min(
             Plasmoid.configuration.maxHeight,
-            pad * 2 + Kirigami.Units.gridUnit * 2
-                + Math.max(1, drives.count) * rowH
+            pad * 2
+                + Kirigami.Units.gridUnit * 2          // заголовок
+                + Kirigami.Units.smallSpacing          // spacing после заголовка
+                + Math.max(1, drives.count) * effectiveRowH
+                + Math.max(0, drives.count - 1) * Kirigami.Units.smallSpacing
         )
     )
 
-    // Дебаунс: не отправляем setPreferredSize если wanted не изменился
+    // Дебаунс: вызываем setPreferredSize только при реальном изменении
     property int lastSentHeight: -1
 
     onWantedHeightChanged: {
@@ -38,6 +51,10 @@ PlasmoidItem {
             root.plasmoid.setPreferredSize(root.width, wantedHeight)
         })
     }
+
+    // Сбрасываем lastSentHeight при изменении количества дисков —
+    // чтобы при повторном подключении тех же н-дисков wanted == lastSent не блокировал вызов
+    onDrivesCountChanged: root.lastSentHeight = -1
 
     property bool scanRunning:    false
     property bool activityRunning: false
@@ -272,9 +289,12 @@ PlasmoidItem {
     // ── Config watchers ───────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
-        function onShowRootChanged()  { root.refresh(0) }
-        function onShowBootChanged()  { root.refresh(0) }
-        function onIconStyleChanged() { root.refreshIcons() }
+        function onShowRootChanged()     { root.refresh(0) }
+        function onShowBootChanged()     { root.refresh(0) }
+        function onIconStyleChanged()    { root.refreshIcons() }
+        function onTextScaleChanged()    { root.lastSentHeight = -1 }
+        function onRowHeightChanged()    { root.lastSentHeight = -1 }
+        function onProgressHeightChanged() { root.lastSentHeight = -1 }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
@@ -378,6 +398,7 @@ PlasmoidItem {
                 Layout.fillHeight: true
                 clip:              true
                 model:             drives
+                spacing:           0
                 boundsBehavior:    Flickable.StopAtBounds
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
@@ -401,7 +422,8 @@ PlasmoidItem {
 
                     width:  list.width - (list.contentHeight > list.height
                                 ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
-                    height: root.rowH
+                    // Строго привязываем к effectiveRowH — не даём тексту наезжать
+                    height: root.effectiveRowH
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
                     onClicked: root.openTarget(target)
@@ -431,8 +453,9 @@ PlasmoidItem {
                         Item {
                             Layout.preferredWidth:  Math.min(
                                 Kirigami.Units.iconSizes.medium,
-                                root.rowH - Kirigami.Units.largeSpacing * 2)
+                                root.effectiveRowH - Kirigami.Units.largeSpacing * 2)
                             Layout.preferredHeight: Layout.preferredWidth
+                            Layout.alignment: Qt.AlignVCenter
                             Kirigami.Icon { anchors.fill: parent; source: driveIcon }
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
@@ -449,8 +472,11 @@ PlasmoidItem {
 
                         ColumnLayout {
                             Layout.fillWidth:  true
+                            Layout.fillHeight: true
                             Layout.alignment:  Qt.AlignVCenter
                             spacing: Kirigami.Units.smallSpacing / 2
+
+                            Item { Layout.fillHeight: true }
 
                             PC3.Label {
                                 text:           title
@@ -483,11 +509,15 @@ PlasmoidItem {
                                 elide:          Text.ElideRight
                                 Layout.fillWidth: true
                             }
-                            PC3.Label {
-                                Layout.alignment: Qt.AlignRight
-                                text:           used + "% " + root.tr2("занято", "used")
-                                color:          view.labelColor
-                                font.pixelSize: root.fontPx(13)
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+                                Item { Layout.fillWidth: true }
+                                PC3.Label {
+                                    text:           used + "% " + root.tr2("занято", "used")
+                                    color:          view.labelColor
+                                    font.pixelSize: root.fontPx(13)
+                                }
                             }
                             Item {
                                 Layout.fillWidth: true
@@ -508,6 +538,8 @@ PlasmoidItem {
                                                 : Kirigami.Theme.highlightColor
                                 }
                             }
+
+                            Item { Layout.fillHeight: true }
                         }
                     }
                 }
