@@ -12,7 +12,7 @@ find_package(Qt6 REQUIRED COMPONENTS Core)
 
 find_package(KF6 REQUIRED COMPONENTS CoreAddons Solid Config)
 
-# Plasma и PlasmaQuick — отдельные cmake-пакеты
+# Plasma и PlasmaQuick живут в одном cmake-пространстве (libplasma)
 find_package(Plasma REQUIRED)
 find_package(PlasmaQuick REQUIRED)
 
@@ -24,7 +24,7 @@ kcoreaddons_add_plugin(io.github.cachyos.drivecard
 target_link_libraries(io.github.cachyos.drivecard
     Qt::Core
     Plasma::Plasma
-    PlasmaQuick::PlasmaQuick
+    Plasma::PlasmaQuick
     KF6::CoreAddons
     KF6::Solid
 )
