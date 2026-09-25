@@ -31,8 +31,8 @@ PlasmoidItem {
         Math.min(
             Plasmoid.configuration.maxHeight,
             pad * 2
-                + Kirigami.Units.gridUnit * 2          // заголовок
-                + Kirigami.Units.smallSpacing          // spacing после заголовка
+                + Kirigami.Units.gridUnit * 2
+                + Kirigami.Units.smallSpacing
                 + Math.max(1, drives.count) * effectiveRowH
                 + Math.max(0, drives.count - 1) * Kirigami.Units.smallSpacing
         )
@@ -51,10 +51,6 @@ PlasmoidItem {
             root.plasmoid.setPreferredSize(root.width, wantedHeight)
         })
     }
-
-    // Сбрасываем lastSentHeight при изменении количества дисков —
-    // чтобы при повторном подключении тех же н-дисков wanted == lastSent не блокировал вызов
-    onDrivesCountChanged: root.lastSentHeight = -1
 
     property bool scanRunning:    false
     property bool activityRunning: false
@@ -75,6 +71,13 @@ PlasmoidItem {
         function onSuspendedChanged() {
             suspendedOverlay.visible = root.plasmoid.suspended
         }
+    }
+
+    // Сбрасываем lastSentHeight при изменении количества дисков —
+    // ListModel эмитит countChanged, правильный способ подписки
+    Connections {
+        target: drives
+        function onCountChanged() { root.lastSentHeight = -1 }
     }
 
     // ── Functions ────────────────────────────────────────────────────────────
@@ -289,11 +292,11 @@ PlasmoidItem {
     // ── Config watchers ───────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
-        function onShowRootChanged()     { root.refresh(0) }
-        function onShowBootChanged()     { root.refresh(0) }
-        function onIconStyleChanged()    { root.refreshIcons() }
-        function onTextScaleChanged()    { root.lastSentHeight = -1 }
-        function onRowHeightChanged()    { root.lastSentHeight = -1 }
+        function onShowRootChanged()       { root.refresh(0) }
+        function onShowBootChanged()       { root.refresh(0) }
+        function onIconStyleChanged()      { root.refreshIcons() }
+        function onTextScaleChanged()      { root.lastSentHeight = -1 }
+        function onRowHeightChanged()      { root.lastSentHeight = -1 }
         function onProgressHeightChanged() { root.lastSentHeight = -1 }
     }
 
@@ -422,7 +425,6 @@ PlasmoidItem {
 
                     width:  list.width - (list.contentHeight > list.height
                                 ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
-                    // Строго привязываем к effectiveRowH — не даём тексту наезжать
                     height: root.effectiveRowH
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
