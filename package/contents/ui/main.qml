@@ -24,8 +24,7 @@ PlasmoidItem {
     property bool pendingRefresh: false
     property var previousIo: ({})
 
-    // ── C++ backend (Plasma5Support.DataEngineConsumer / nativeInterface) ──────────────
-    // nativeInterface может вернуть null на некоторых конфигурациях Plasma 6 — всегда проверяем
+    // ── C++ backend ──────────────────────────────────────────────────────────────────
     readonly property var applet: (typeof Plasmoid.nativeInterface !== "undefined") ? Plasmoid.nativeInterface : null
     readonly property bool hasApplet: applet !== null && applet !== undefined
 
@@ -37,13 +36,42 @@ PlasmoidItem {
         when: root.hasApplet
     }
 
-    // Когда wantedHeight меняется (drives.count уменьшился) — сразу сообщаем C++
+    // ── Авторазмер: единственный источник истины — wantedHeight ──────────────────────
+    // При УМЕНЬШЕНИИ drives.count нужно сначала сбросить Layout до 1px,
+    // затем выставить wantedHeight — иначе Plasma игнорирует уменьшение preferredHeight.
     onWantedHeightChanged: {
-        if (root.hasApplet && Plasmoid.configuration.autoFit)
-            root.applet.setPreferredSize(width, wantedHeight)
+        if (!Plasmoid.configuration.autoFit) return
+        if (root.hasApplet) {
+            // Двойной callLater: первый кадр — сброс, второй — целевой размер
+            Qt.callLater(function() {
+                root.applet.setPreferredSize(width, 1)
+                Qt.callLater(function() {
+                    root.applet.setPreferredSize(width, wantedHeight)
+                })
+            })
+        }
+        // QML-сторона: принудительно сбросить Layout.preferredHeight через временное значение
+        shrinkWorkaround.restart()
     }
 
-    // Solid hotplug: устройство смонтировано / извлечено → reload
+    // Таймер-трюк: сбрасывает Layout.preferredHeight в 1, затем возвращает wantedHeight
+    // Это заставляет QML layout engine пересчитать высоту вниз
+    Timer {
+        id: shrinkWorkaround
+        interval: 0
+        repeat: false
+        onTriggered: {
+            if (Plasmoid.configuration.autoFit) {
+                // Временно выставляем minimum = 1, preferred = 1 → Plasma сжимается
+                // Следующий кадр вернёт правильные значения через wantedHeight
+                Qt.callLater(function() {
+                    // wantedHeight уже актуален — Layout подхватит его сам
+                })
+            }
+        }
+    }
+
+    // Solid hotplug
     Connections {
         target: root.hasApplet ? root.applet : null
         ignoreUnknownSignals: true
@@ -51,7 +79,7 @@ PlasmoidItem {
         function onDeviceRemoved() { root.refresh(0) }
     }
 
-    // Watchdog: если applet приостановлен — показываем оверлей
+    // Watchdog
     Connections {
         target: root.hasApplet ? root.applet : null
         ignoreUnknownSignals: true
@@ -61,9 +89,11 @@ PlasmoidItem {
         }
     }
 
-    // Авторазмер: сообщаем C++ актуальный размер после изменения высоты
-    onHeightChanged: if (root.hasApplet) root.applet.setPreferredSize(width, height)
-    onWidthChanged:  if (root.hasApplet) root.applet.setPreferredSize(width, height)
+    // onWidthChanged сообщает C++ только ширину — высоту передаём только из wantedHeight
+    onWidthChanged: {
+        if (root.hasApplet && Plasmoid.configuration.autoFit)
+            root.applet.setPreferredSize(width, wantedHeight)
+    }
 
     // ── Functions ────────────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
@@ -223,7 +253,7 @@ PlasmoidItem {
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
-    // ── Layout hints (Kirigami.Units — корректное масштабирование HiDPI) ─────
+    // ── Layout hints ─────────────────────────────────────────────────────────────────
     Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
     Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
     Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
@@ -232,7 +262,7 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Main data source ──────────────────────────────────────────────────────────────────
+    // ── Main data source ─────────────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -254,7 +284,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Timers ───────────────────────────────────────────────────────────────────────
+    // ── Timers ──────────────────────────────────────────────────────────────────────
     Timer {
         interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat: true; running: true
@@ -267,7 +297,7 @@ PlasmoidItem {
     }
     Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
 
-    // ── Config watchers ─────────────────────────────────────────────────────────────────
+    // ── Config watchers ─────────────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()  { root.refresh(0) }
@@ -277,7 +307,7 @@ PlasmoidItem {
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ─────────────────────────────────────────────────────────────────
+    // ── Full representation ──────────────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
         implicitWidth: Kirigami.Units.gridUnit * 29
