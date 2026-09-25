@@ -10,12 +10,11 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
-# Config (а не KConfig) — именно так называется компонент в ECM
-# (/usr/lib/cmake/KF6Config/KF6ConfigConfig.cmake)
 find_package(KF6 REQUIRED COMPONENTS CoreAddons Solid Config)
 
-# Plasma живёт в своём cmake-пространстве (libplasma → /usr/lib/cmake/Plasma/)
+# Plasma и PlasmaQuick — отдельные cmake-пакеты
 find_package(Plasma REQUIRED)
+find_package(PlasmaQuick REQUIRED)
 
 kcoreaddons_add_plugin(io.github.cachyos.drivecard
     SOURCES src/drivecard_applet.cpp src/drivecard_applet.h
@@ -25,6 +24,7 @@ kcoreaddons_add_plugin(io.github.cachyos.drivecard
 target_link_libraries(io.github.cachyos.drivecard
     Qt::Core
     Plasma::Plasma
+    PlasmaQuick::PlasmaQuick
     KF6::CoreAddons
     KF6::Solid
 )

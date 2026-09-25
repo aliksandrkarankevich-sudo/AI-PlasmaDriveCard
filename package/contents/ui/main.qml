@@ -25,11 +25,13 @@ PlasmoidItem {
         )
     )
 
-    // ── ДИАГНОСТИКА: точка 1 — меняется ли wantedHeight ─────────────────────
-    onWantedHeightChanged:
-        console.log("[DC] wantedHeight=", wantedHeight,
-                    "drives.count=", drives.count,
-                    "root.height=", root.height)
+    // Авторазмер: при каждом изменении wantedHeight просим C++ изменить
+    // физический размер виджета через PlasmaQuick::AppletQuickItem::setSize.
+    // Работает в обе стороны — и при росте и при уменьшении drives.count.
+    onWantedHeightChanged: {
+        if (root.hasApplet && Plasmoid.configuration.autoFit)
+            root.applet.setPreferredSize(root.width, root.wantedHeight)
+    }
 
     property bool scanRunning:    false
     property bool activityRunning: false
@@ -184,9 +186,6 @@ PlasmoidItem {
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
         if (root.hasApplet) root.applet.reportResult(true)
-        // ── ДИАГНОСТИКА: точка 2 — что видим сразу после rebuild ────────────
-        console.log("[DC] rebuild done: drives.count=", drives.count,
-                    "wantedHeight=", wantedHeight)
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -299,12 +298,6 @@ PlasmoidItem {
         Layout.preferredHeight: root.wantedHeight
         Layout.maximumHeight:   Plasmoid.configuration.autoFit
                                     ? root.wantedHeight : 16777215
-
-        // ── ДИАГНОСТИКА: точка 3 — меняется ли физический размер view ────────
-        onHeightChanged:
-            console.log("[DC] view.height=", height,
-                        "implicitHeight=", implicitHeight,
-                        "wantedHeight=", root.wantedHeight)
 
         // ── Цвета ────────────────────────────────────────────────────────────
         readonly property color backgroundBase:
