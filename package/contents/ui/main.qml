@@ -36,41 +36,6 @@ PlasmoidItem {
         when: root.hasApplet
     }
 
-    // ── Авторазмер: единственный источник истины — wantedHeight ──────────────────────
-    // При УМЕНЬШЕНИИ drives.count нужно сначала сбросить Layout до 1px,
-    // затем выставить wantedHeight — иначе Plasma игнорирует уменьшение preferredHeight.
-    onWantedHeightChanged: {
-        if (!Plasmoid.configuration.autoFit) return
-        if (root.hasApplet) {
-            // Двойной callLater: первый кадр — сброс, второй — целевой размер
-            Qt.callLater(function() {
-                root.applet.setPreferredSize(width, 1)
-                Qt.callLater(function() {
-                    root.applet.setPreferredSize(width, wantedHeight)
-                })
-            })
-        }
-        // QML-сторона: принудительно сбросить Layout.preferredHeight через временное значение
-        shrinkWorkaround.restart()
-    }
-
-    // Таймер-трюк: сбрасывает Layout.preferredHeight в 1, затем возвращает wantedHeight
-    // Это заставляет QML layout engine пересчитать высоту вниз
-    Timer {
-        id: shrinkWorkaround
-        interval: 0
-        repeat: false
-        onTriggered: {
-            if (Plasmoid.configuration.autoFit) {
-                // Временно выставляем minimum = 1, preferred = 1 → Plasma сжимается
-                // Следующий кадр вернёт правильные значения через wantedHeight
-                Qt.callLater(function() {
-                    // wantedHeight уже актуален — Layout подхватит его сам
-                })
-            }
-        }
-    }
-
     // Solid hotplug
     Connections {
         target: root.hasApplet ? root.applet : null
@@ -89,11 +54,12 @@ PlasmoidItem {
         }
     }
 
-    // onWidthChanged сообщает C++ только ширину — высоту передаём только из wantedHeight
-    onWidthChanged: {
-        if (root.hasApplet && Plasmoid.configuration.autoFit)
-            root.applet.setPreferredSize(width, wantedHeight)
-    }
+    // ── Layout hints ─────────────────────────────────────────────────────────────────
+    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
+    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
+    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
+    Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 25
+    Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
 
     // ── Functions ────────────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
@@ -253,13 +219,6 @@ PlasmoidItem {
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
-    // ── Layout hints ─────────────────────────────────────────────────────────────────
-    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
-    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
-    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
-    Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 25
-    Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
-
     ListModel { id: drives }
 
     // ── Main data source ─────────────────────────────────────────────────────────────
@@ -310,7 +269,12 @@ PlasmoidItem {
     // ── Full representation ──────────────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
-        implicitWidth: Kirigami.Units.gridUnit * 29
+
+        // implicitHeight — единственный источник истины для авторазмера.
+        // Plasma 6 читает это значение напрямую и масштабирует виджет
+        // симметрично: и вверх, и вниз.
+        implicitWidth:  Kirigami.Units.gridUnit * 29
+        implicitHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : -1
 
         readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
             ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
