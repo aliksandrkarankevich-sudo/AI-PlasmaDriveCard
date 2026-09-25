@@ -25,13 +25,18 @@ PlasmoidItem {
         )
     )
 
-    // Авторазмер: root.plasmoid — это AppletQuickItem::applet(), т.е. наш DriveCardApplet.
-    // setPreferredSize() — Q_INVOKABLE на DriveCardApplet, вызываем через root.plasmoid.
+    // Дебаунс: не отправляем setPreferredSize если wanted не изменился
+    property int lastSentHeight: -1
+
     onWantedHeightChanged: {
-        console.log("[DC] wanted=", wantedHeight, "count=", drives.count,
-                    "root.h=", root.height, "autoFit=", Plasmoid.configuration.autoFit)
-        if (Plasmoid.configuration.autoFit)
+        if (!Plasmoid.configuration.autoFit) return
+        if (wantedHeight === lastSentHeight) return
+        lastSentHeight = wantedHeight
+        Qt.callLater(function() {
+            console.log("[DC] setPreferredSize wanted=", wantedHeight,
+                        "count=", drives.count, "root.h=", root.height)
             root.plasmoid.setPreferredSize(root.width, wantedHeight)
+        })
     }
 
     property bool scanRunning:    false
@@ -39,7 +44,6 @@ PlasmoidItem {
     property bool pendingRefresh:  false
     property var  previousIo:      ({})
 
-    // driveCount — Q_PROPERTY на DriveCardApplet
     Binding {
         target:   root.plasmoid
         property: "driveCount"
@@ -289,7 +293,6 @@ PlasmoidItem {
         Layout.maximumHeight:   Plasmoid.configuration.autoFit
                                     ? root.wantedHeight : 16777215
 
-        // ── Цвета ────────────────────────────────────────────────────────────
         readonly property color backgroundBase:
             Plasmoid.configuration.backgroundColorMode === "custom"
                 ? Plasmoid.configuration.backgroundColor
@@ -302,7 +305,6 @@ PlasmoidItem {
             textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
 
-        // ── Фон ──────────────────────────────────────────────────────────────
         EdgeFadeBackground {
             anchors.fill: parent
             baseColor:   view.backgroundBase
@@ -314,7 +316,6 @@ PlasmoidItem {
                              ? Plasmoid.configuration.cornerRadius : 0
         }
 
-        // ── Watchdog overlay ─────────────────────────────────────────────────
         Rectangle {
             id: suspendedOverlay
             anchors.fill: parent
@@ -343,7 +344,6 @@ PlasmoidItem {
             }
         }
 
-        // ── Контент ───────────────────────────────────────────────────────────
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: root.pad
