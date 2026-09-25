@@ -25,12 +25,18 @@ PlasmoidItem {
         )
     )
 
-    // Авторазмер: при каждом изменении wantedHeight просим C++ изменить
-    // физический размер виджета через PlasmaQuick::AppletQuickItem::setSize.
-    // Работает в обе стороны — и при росте и при уменьшении drives.count.
     onWantedHeightChanged: {
-        if (root.hasApplet && Plasmoid.configuration.autoFit)
+        console.log("[DC] wanted=", wantedHeight,
+                    "count=", drives.count,
+                    "root.h before=", root.height,
+                    "hasApplet=", root.hasApplet,
+                    "autoFit=", Plasmoid.configuration.autoFit)
+        if (root.hasApplet && Plasmoid.configuration.autoFit) {
             root.applet.setPreferredSize(root.width, root.wantedHeight)
+            Qt.callLater(function() {
+                console.log("[DC] root.h after setPreferredSize=", root.height)
+            })
+        }
     }
 
     property bool scanRunning:    false
