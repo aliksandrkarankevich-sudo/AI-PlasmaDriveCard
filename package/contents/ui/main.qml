@@ -13,42 +13,40 @@ PlasmoidItem {
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
     readonly property bool ru: Plasmoid.configuration.language !== "en"
-    readonly property int pad: Plasmoid.configuration.contentPadding
-    readonly property int rowH: Plasmoid.configuration.rowHeight
+    readonly property int  pad:  Plasmoid.configuration.contentPadding
+    readonly property int  rowH: Plasmoid.configuration.rowHeight
+
+    // Желаемая высота: шапка + строки дисков, зажатая между min и maxHeight.
+    // Math.max(1, drives.count) — хотя бы одна строка когда список пуст,
+    // чтобы виджет не схлопывался до одной шапки.
     readonly property int wantedHeight: Math.max(
         Kirigami.Units.gridUnit * 9,
-        Math.min(Plasmoid.configuration.maxHeight,
-            pad * 2 + Kirigami.Units.gridUnit * 2 + Math.max(1, drives.count) * rowH))
-    property bool scanRunning: false
-    property bool activityRunning: false
-    property bool pendingRefresh: false
-    property var previousIo: ({})
+        Math.min(
+            Plasmoid.configuration.maxHeight,
+            pad * 2 + Kirigami.Units.gridUnit * 2
+                + Math.max(1, drives.count) * rowH
+        )
+    )
 
-    // ── C++ backend ──────────────────────────────────────────────────────────────────
-    readonly property var applet: (typeof Plasmoid.nativeInterface !== "undefined") ? Plasmoid.nativeInterface : null
+    property bool scanRunning:    false
+    property bool activityRunning: false
+    property bool pendingRefresh:  false
+    property var  previousIo:      ({})
+
+    // ── C++ backend ──────────────────────────────────────────────────────────
+    readonly property var  applet:    (typeof Plasmoid.nativeInterface !== "undefined")
+                                          ? Plasmoid.nativeInterface : null
     readonly property bool hasApplet: applet !== null && applet !== undefined
 
-    // Держим C++ в курсе количества дисков
+    // Сообщаем C++ количество дисков (нужно watchdog-у)
     Binding {
-        target: root.hasApplet ? root.applet : null
+        target:   root.hasApplet ? root.applet : null
         property: "driveCount"
-        value: drives.count
-        when: root.hasApplet
+        value:    drives.count
+        when:     root.hasApplet
     }
 
-    // ── Авторазмер ───────────────────────────────────────────────────────────────────
-    // Гуард: не вызываем пока width=0 (начальная инициализация виджета)
-    function applySize() {
-        if (!Plasmoid.configuration.autoFit) return
-        if (!root.hasApplet) return
-        if (root.width <= 0) return
-        root.applet.setPreferredSize(root.width, root.wantedHeight)
-    }
-
-    onWantedHeightChanged: applySize()
-    onWidthChanged:        applySize()
-
-    // Solid hotplug
+    // Solid hotplug → немедленный refresh
     Connections {
         target: root.hasApplet ? root.applet : null
         ignoreUnknownSignals: true
@@ -56,7 +54,7 @@ PlasmoidItem {
         function onDeviceRemoved() { root.refresh(0) }
     }
 
-    // Watchdog
+    // Watchdog: C++ сигнализирует о приостановке
     Connections {
         target: root.hasApplet ? root.applet : null
         ignoreUnknownSignals: true
@@ -66,26 +64,21 @@ PlasmoidItem {
         }
     }
 
-    // ── Layout hints (запасные, когда C++ недоступен) ───────────────────────────
-    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
-    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
-    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
-    Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 25
-    Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
-
-    // ── Functions ────────────────────────────────────────────────────────────────────
-    function tr2(r, e) { return ru ? r : e }
-    function fontPx(base) { return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0)) }
+    // ── Functions ────────────────────────────────────────────────────────────
+    function tr2(r, e)   { return ru ? r : e }
+    function fontPx(base) {
+        return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
+    }
     function openTarget(target) {
         if (!target) return
         var url = target.endsWith("/") ? target : target + "/"
         Qt.openUrlExternally("file://" + encodeURI(url))
     }
     function displayIcon(target, physical) {
-        if (Plasmoid.configuration.iconStyle === "folder") return "folder"
+        if (Plasmoid.configuration.iconStyle === "folder")      return "folder"
         if (Plasmoid.configuration.iconStyle === "folder-open") return "folder-open"
-        return target === "/" ? "drive-harddisk-root" :
-            (physical.indexOf("USB ") === 0 ? "drive-removable-media-usb" : "drive-harddisk")
+        return target === "/" ? "drive-harddisk-root"
+            : (physical.indexOf("USB ") === 0 ? "drive-removable-media-usb" : "drive-harddisk")
     }
     function basename(path) {
         var p = (path || "").replace(/\/$/, "")
@@ -95,30 +88,32 @@ PlasmoidItem {
     function prettyFs(value) {
         var v = (value || "").toLowerCase()
         if (v === "btrfs") return "Btrfs"
-        if (v === "vfat") return "FAT"
+        if (v === "vfat")  return "FAT"
         if (v === "exfat") return "exFAT"
         return v.toUpperCase()
     }
     function formatBytes(number) {
         var n = Number(number) || 0
-        var units = ru ? ["Б", "КиБ", "МиБ", "ГиБ", "ТиБ"] : ["B", "KiB", "MiB", "GiB", "TiB"]
+        var units = ru
+            ? ["Б", "КиБ", "МиБ", "ГиБ", "ТиБ"]
+            : ["B", "KiB", "MiB", "GiB", "TiB"]
         var i = 0
         while (n >= 1024 && i < units.length - 1) { n /= 1024; ++i }
         return Qt.locale(ru ? "ru_RU" : "en_US").toString(n, "f", i < 3 ? 0 : 1) + " " + units[i]
     }
     function shortDrive(source, map) {
-        var key = cleanSource(source)
+        var key  = cleanSource(source)
         var node = map[key] || map[basename(key)]
         var guard = 0
         while (node && node.type !== "disk" && node.pkname && guard++ < 12)
             node = map[node.pkname] || map["/dev/" + node.pkname]
         if (!node) return ""
-        var name = node.name || basename(node.path || "")
-        var tran = (node.tran || "").toLowerCase()
+        var name  = node.name || basename(node.path || "")
+        var tran  = (node.tran || "").toLowerCase()
         var match = /^nvme(\d+)n\d+$/.exec(name)
-        if (match) return "NVMe " + match[1]
-        if (tran === "usb") return "USB " + name
-        if (tran === "sata" || /^sd[a-z]+$/.test(name)) return "SATA " + name
+        if (match)                                         return "NVMe " + match[1]
+        if (tran === "usb")                                return "USB " + name
+        if (tran === "sata" || /^sd[a-z]+$/.test(name))   return "SATA " + name
         return tran ? tran.toUpperCase() + " " + name : tr2("Диск ", "Disk ") + name
     }
     function flatten(items, output) {
@@ -128,14 +123,13 @@ PlasmoidItem {
         }
     }
     function rebuild(output) {
-        var marker = "__DC_LSBLK__"
+        var marker      = "__DC_LSBLK__"
         var markerIndex = output.indexOf(marker)
         if (markerIndex < 0) {
             if (root.hasApplet) root.applet.reportResult(false)
             return
         }
-        var findmntData
-        var lsblkData
+        var findmntData, lsblkData
         try {
             findmntData = JSON.parse(output.substring(0, markerIndex).trim())
             lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
@@ -144,39 +138,40 @@ PlasmoidItem {
             if (root.hasApplet) root.applet.reportResult(false)
             return
         }
-        var map = ({})
+        var map    = ({})
         var blocks = lsblkData.blockdevices || []
         for (var i = 0; i < blocks.length; ++i) {
             var block = blocks[i]
-            map[block.name]                   = block
-            if (block.path) map[block.path]   = block
-            map["/dev/" + block.name]         = block
-            map["/dev/mapper/" + block.name]  = block
+            map[block.name]                  = block
+            if (block.path) map[block.path]  = block
+            map["/dev/" + block.name]        = block
+            map["/dev/mapper/" + block.name] = block
         }
-        var all = []
+        var all  = []
         var rows = []
         var seen = ({})
         flatten(findmntData.filesystems || [], all)
         for (var j = 0; j < all.length; ++j) {
-            var fs = all[j]
+            var fs     = all[j]
             var target = fs.target || ""
             var source = cleanSource(fs.source)
             if (!target || source.indexOf("/dev/") !== 0) continue
-            if (!Plasmoid.configuration.showRoot && target === "/") continue
+            if (!Plasmoid.configuration.showRoot && target === "/")                           continue
             if (!Plasmoid.configuration.showBoot && (target === "/boot" || target === "/boot/efi")) continue
             if (seen[source]) continue
             var size      = Number(fs.size)  || 0
             var available = Number(fs.avail) || 0
             var used      = parseInt(String(fs["use%"] || "0")) || 0
             var label     = fs.label || ""
-            if (target === "/")   label = tr2("Система", "System")
-            else if (!label)      label = basename(target)
+            if (target === "/") label = tr2("Система", "System")
+            else if (!label)    label = basename(target)
             var physical = shortDrive(source, map)
             rows.push({
                 title: label, target: target, source: source,
                 fs: prettyFs(fs.fstype), physical: physical,
                 total: size, available: available, used: used,
-                driveIcon: displayIcon(target, physical), kname: basename(source), active: false
+                driveIcon: displayIcon(target, physical),
+                kname: basename(source), active: false
             })
             seen[source] = true
         }
@@ -189,8 +184,6 @@ PlasmoidItem {
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
         if (root.hasApplet) root.applet.reportResult(true)
-        // После первого заполнения списка — точно знаем width, применяем размер
-        Qt.callLater(root.applySize)
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -205,16 +198,18 @@ PlasmoidItem {
     }
     function applyActivity(output) {
         var current = ({})
-        var lines = output.split("\n")
+        var lines   = output.split("\n")
         for (var i = 0; i < lines.length; ++i) {
             var parts = lines[i].trim().split(/\s+/)
-            if (parts.length >= 11) current[parts[2]] = String(parts[3]) + ":" + String(parts[7])
+            if (parts.length >= 11)
+                current[parts[2]] = String(parts[3]) + ":" + String(parts[7])
         }
         for (var j = 0; j < drives.count; ++j) {
-            var row = drives.get(j)
+            var row    = drives.get(j)
             var now    = current[row.kname]
             var before = previousIo[row.kname]
-            drives.setProperty(j, "active", now !== undefined && before !== undefined && now !== before)
+            drives.setProperty(j, "active",
+                now !== undefined && before !== undefined && now !== before)
         }
         previousIo = current
     }
@@ -225,7 +220,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Commands ────────────────────────────────────────────────────────────────────
+    // ── Commands ─────────────────────────────────────────────────────────────
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript:
         "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
@@ -235,7 +230,7 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Main data source ─────────────────────────────────────────────────────────────
+    // ── Data source ───────────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -257,20 +252,28 @@ PlasmoidItem {
         }
     }
 
-    // ── Timers ──────────────────────────────────────────────────────────────────────
+    // ── Timers ────────────────────────────────────────────────────────────────
     Timer {
-        interval: Math.max(15, Plasmoid.configuration.updateInterval) * 1000
-        repeat: true; running: true
+        interval:  Math.max(15, Plasmoid.configuration.updateInterval) * 1000
+        repeat:    true
+        running:   true
         onTriggered: root.refresh(0)
     }
     Timer {
-        interval: Math.max(1, Plasmoid.configuration.activityInterval) * 1000
-        repeat: true; running: Plasmoid.configuration.showActivity; triggeredOnStart: true
+        interval:         Math.max(1, Plasmoid.configuration.activityInterval) * 1000
+        repeat:           true
+        running:          Plasmoid.configuration.showActivity
+        triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
-    Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
+    Timer {
+        id: delayedRefresh
+        interval: 1200
+        repeat:   false
+        onTriggered: root.refresh(0)
+    }
 
-    // ── Config watchers ─────────────────────────────────────────────────────────────
+    // ── Config watchers ───────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()  { root.refresh(0) }
@@ -280,19 +283,40 @@ PlasmoidItem {
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ──────────────────────────────────────────────────────────
+    // ── Full representation ───────────────────────────────────────────────────
+    // ВАЖНО: Layout.* и implicitHeight задаются ЗДЕСЬ, а не на PlasmoidItem.
+    // Plasma Desktop (AppletQuickItem) читает geometry именно из
+    // fullRepresentation в рантайме — только так работает авторазмер.
     fullRepresentation: Item {
         id: view
-        implicitWidth: Kirigami.Units.gridUnit * 29
 
-        readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
-            ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
-        readonly property color textBase: Plasmoid.configuration.textColorMode === "custom"
-            ? Plasmoid.configuration.textColor : Kirigami.Theme.textColor
+        // implicitHeight — сигнал для Plasma: «столько мне нужно».
+        // Меняется автоматически при изменении drives.count → wantedHeight.
+        implicitWidth:  Kirigami.Units.gridUnit * 29
+        implicitHeight: root.wantedHeight
+
+        // Layout.* внутри fullRepresentation — читаются Shell в рантайме.
+        Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
+        Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
+        Layout.minimumHeight:   Kirigami.Units.gridUnit * 9
+        Layout.preferredHeight: root.wantedHeight
+        Layout.maximumHeight:   Plasmoid.configuration.autoFit
+                                    ? root.wantedHeight : 16777215
+
+        // ── Цвета ────────────────────────────────────────────────────────────
+        readonly property color backgroundBase:
+            Plasmoid.configuration.backgroundColorMode === "custom"
+                ? Plasmoid.configuration.backgroundColor
+                : Kirigami.Theme.backgroundColor
+        readonly property color textBase:
+            Plasmoid.configuration.textColorMode === "custom"
+                ? Plasmoid.configuration.textColor
+                : Kirigami.Theme.textColor
         readonly property color labelColor: Qt.rgba(
             textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
 
+        // ── Фон ──────────────────────────────────────────────────────────────
         EdgeFadeBackground {
             anchors.fill: parent
             baseColor:   view.backgroundBase
@@ -300,15 +324,18 @@ PlasmoidItem {
             edgeAlpha:   Plasmoid.configuration.edgeOpacity / 100.0
             fadeWidth:   Plasmoid.configuration.edgeWidth
             curve:       Plasmoid.configuration.edgeCurve / 100.0
-            radius:      Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            radius:      Plasmoid.configuration.rounded
+                             ? Plasmoid.configuration.cornerRadius : 0
         }
 
+        // ── Watchdog overlay ─────────────────────────────────────────────────
         Rectangle {
             id: suspendedOverlay
             anchors.fill: parent
             visible: false
-            color: Qt.rgba(0, 0, 0, 0.55)
-            radius: Plasmoid.configuration.rounded ? Plasmoid.configuration.cornerRadius : 0
+            color:   Qt.rgba(0, 0, 0, 0.55)
+            radius:  Plasmoid.configuration.rounded
+                         ? Plasmoid.configuration.cornerRadius : 0
             z: 99
             Column {
                 anchors.centerIn: parent
@@ -320,19 +347,23 @@ PlasmoidItem {
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
                 PC3.Label {
-                    text: root.tr2("Виджет приостановлен\nПовтор через 30 с",
-                                   "Widget suspended\nRetrying in 30 s")
-                    color: "white"; horizontalAlignment: Text.AlignHCenter
+                    text: root.tr2(
+                        "Виджет приостановлен\nПовтор через 30 с",
+                        "Widget suspended\nRetrying in 30 s")
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
                     font.pixelSize: root.fontPx(14)
                 }
             }
         }
 
+        // ── Контент ───────────────────────────────────────────────────────────
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: root.pad
             spacing: Kirigami.Units.smallSpacing
 
+            // Шапка
             RowLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -343,23 +374,28 @@ PlasmoidItem {
                 }
                 PC3.Label {
                     text: root.tr2("Диски", "Drives")
-                    color: view.labelColor; font.bold: true
-                    font.pixelSize: root.fontPx(20); Layout.fillWidth: true
+                    color: view.labelColor
+                    font.bold:       true
+                    font.pixelSize:  root.fontPx(20)
+                    Layout.fillWidth: true
                 }
                 PC3.Label {
-                    text: drives.count
-                    color: view.labelColor; opacity: 0.72
+                    text:           drives.count
+                    color:          view.labelColor
+                    opacity:        0.72
                     font.pixelSize: root.fontPx(13)
                 }
             }
 
+            // Список дисков
             ListView {
                 id: list
-                Layout.fillWidth: true
+                Layout.fillWidth:  true
                 Layout.fillHeight: true
-                clip: true
-                model: drives
-                boundsBehavior: Flickable.StopAtBounds
+                clip:              true
+                model:             drives
+                boundsBehavior:    Flickable.StopAtBounds
+
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height
                         ? QQC2.ScrollBar.AsNeeded
@@ -380,21 +416,22 @@ PlasmoidItem {
                     required property bool   active
 
                     width:  list.width - (list.contentHeight > list.height
-                        ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
+                                ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
                     height: root.rowH
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
                     onClicked: root.openTarget(target)
 
                     QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text: source + "\n" + target
-                    QQC2.ToolTip.delay: 600
+                    QQC2.ToolTip.text:   source + "\n" + target
+                    QQC2.ToolTip.delay:  600
 
                     background: Rectangle {
                         color: parent.hovered
-                            ? Qt.rgba(Kirigami.Theme.highlightColor.r,
-                                      Kirigami.Theme.highlightColor.g,
-                                      Kirigami.Theme.highlightColor.b, 0.12)
+                            ? Qt.rgba(
+                                Kirigami.Theme.highlightColor.r,
+                                Kirigami.Theme.highlightColor.g,
+                                Kirigami.Theme.highlightColor.b, 0.12)
                             : "transparent"
                         radius: Plasmoid.configuration.rounded
                             ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad) : 0
@@ -402,10 +439,10 @@ PlasmoidItem {
                     }
 
                     contentItem: RowLayout {
-                        anchors.fill: parent
+                        anchors.fill:        parent
                         anchors.leftMargin:  Kirigami.Units.smallSpacing
                         anchors.rightMargin: Kirigami.Units.largeSpacing
-                        spacing: Kirigami.Units.largeSpacing
+                        spacing:             Kirigami.Units.largeSpacing
 
                         Item {
                             Layout.preferredWidth:  Math.min(
@@ -418,45 +455,55 @@ PlasmoidItem {
                                 width:  Kirigami.Units.smallSpacing * 2
                                 height: Kirigami.Units.smallSpacing * 2
                                 radius: Kirigami.Units.smallSpacing
-                                anchors.right: parent.right; anchors.bottom: parent.bottom
-                                color: Kirigami.Theme.positiveTextColor
+                                anchors.right:  parent.right
+                                anchors.bottom: parent.bottom
+                                color:        Kirigami.Theme.positiveTextColor
                                 border.width: Math.max(1, Kirigami.Units.smallSpacing / 2)
                                 border.color: Kirigami.Theme.backgroundColor
                             }
                         }
 
                         ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.alignment: Qt.AlignVCenter
+                            Layout.fillWidth:  true
+                            Layout.alignment:  Qt.AlignVCenter
                             spacing: Kirigami.Units.smallSpacing / 2
 
                             PC3.Label {
-                                text: title; color: view.labelColor
-                                font.bold: true; font.pixelSize: root.fontPx(18)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                text:           title
+                                color:          view.labelColor
+                                font.bold:      true
+                                font.pixelSize: root.fontPx(18)
+                                elide:          Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
                                 text: root.formatBytes(available) + " "
                                     + root.tr2("свободно из", "free of") + " "
                                     + root.formatBytes(total)
-                                color: view.labelColor; font.pixelSize: root.fontPx(16)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                color:          view.labelColor
+                                font.pixelSize: root.fontPx(16)
+                                elide:          Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
-                                visible: Plasmoid.configuration.showFs || Plasmoid.configuration.showPhysical
+                                visible: Plasmoid.configuration.showFs
+                                      || Plasmoid.configuration.showPhysical
                                 text: {
                                     var a = Plasmoid.configuration.showFs       ? fs       : ""
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
                                     return (a && b) ? (a + "  •  " + b) : (a + b)
                                 }
-                                color: view.labelColor; opacity: 0.72
+                                color:          view.labelColor
+                                opacity:        0.72
                                 font.pixelSize: root.fontPx(13)
-                                elide: Text.ElideRight; Layout.fillWidth: true
+                                elide:          Text.ElideRight
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
                                 Layout.alignment: Qt.AlignRight
-                                text: used + "% " + root.tr2("занято", "used")
-                                color: view.labelColor; font.pixelSize: root.fontPx(13)
+                                text:           used + "% " + root.tr2("занято", "used")
+                                color:          view.labelColor
+                                font.pixelSize: root.fontPx(13)
                             }
                             Item {
                                 Layout.fillWidth: true
@@ -465,9 +512,9 @@ PlasmoidItem {
                                     Plasmoid.configuration.progressHeight)
                                 clip: true
                                 QQC2.ProgressBar {
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    anchors.left:            parent.left
+                                    anchors.right:           parent.right
+                                    anchors.verticalCenter:  parent.verticalCenter
                                     from: 0; to: 100; value: used
                                     palette.highlight:
                                         used >= Plasmoid.configuration.criticalPercent
@@ -481,13 +528,15 @@ PlasmoidItem {
                     }
                 }
 
+                // Заглушка при пустом списке
                 PC3.Label {
                     anchors.centerIn: parent
-                    visible: drives.count === 0
+                    visible:        drives.count === 0
                     text: root.scanRunning
-                        ? root.tr2("Обновление...", "Refreshing...")
+                        ? root.tr2("Обновление...",            "Refreshing...")
                         : root.tr2("Доступные диски не найдены", "No accessible drives found")
-                    color: view.labelColor; opacity: 0.75
+                    color:          view.labelColor
+                    opacity:        0.75
                     font.pixelSize: root.fontPx(15)
                 }
             }
