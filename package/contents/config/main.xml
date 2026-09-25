@@ -8,6 +8,7 @@
     <entry name="language"           type="String"><default>ru</default></entry>
     <entry name="autoFit"            type="Bool">  <default>true</default></entry>
     <entry name="rowHeight"          type="Int">   <default>112</default></entry>
+    <entry name="separatorHeight"    type="Int">   <default>1</default></entry>
     <entry name="textScale"          type="Int">   <default>100</default></entry>
     <entry name="progressHeight"     type="Int">   <default>8</default></entry>
     <entry name="maxHeight"          type="Int">   <default>720</default></entry>

@@ -15,6 +15,7 @@ PlasmoidItem {
     readonly property bool ru: Plasmoid.configuration.language !== "en"
     readonly property int  pad:  Plasmoid.configuration.contentPadding
     readonly property int  rowH: Plasmoid.configuration.rowHeight
+    readonly property int  sepH: Plasmoid.configuration.separatorHeight
 
     // Минимальная высота одной строки с учётом текущего шрифта
     readonly property int effectiveRowH: Math.max(
@@ -25,7 +26,7 @@ PlasmoidItem {
             + Kirigami.Units.largeSpacing * 2
     )
 
-    // Высота всех строк + заголовок + паддинги + spacing между ними
+    // Высота всех строк + заголовок + паддинги + сепараторы между строками
     readonly property int wantedHeight: Math.max(
         Kirigami.Units.gridUnit * 9,
         Math.min(
@@ -34,7 +35,7 @@ PlasmoidItem {
                 + Kirigami.Units.gridUnit * 2
                 + Kirigami.Units.smallSpacing
                 + Math.max(1, drives.count) * effectiveRowH
-                + Math.max(0, drives.count - 1) * Kirigami.Units.smallSpacing
+                + Math.max(0, drives.count - 1) * (sepH > 0 ? sepH : 0)
         )
     )
 
@@ -73,8 +74,7 @@ PlasmoidItem {
         }
     }
 
-    // Сбрасываем lastSentHeight при изменении количества дисков —
-    // ListModel эмитит countChanged, правильный способ подписки
+    // Сбрасываем lastSentHeight при изменении количества дисков
     Connections {
         target: drives
         function onCountChanged() { root.lastSentHeight = -1 }
@@ -292,12 +292,13 @@ PlasmoidItem {
     // ── Config watchers ───────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
-        function onShowRootChanged()       { root.refresh(0) }
-        function onShowBootChanged()       { root.refresh(0) }
-        function onIconStyleChanged()      { root.refreshIcons() }
-        function onTextScaleChanged()      { root.lastSentHeight = -1 }
-        function onRowHeightChanged()      { root.lastSentHeight = -1 }
-        function onProgressHeightChanged() { root.lastSentHeight = -1 }
+        function onShowRootChanged()         { root.refresh(0) }
+        function onShowBootChanged()         { root.refresh(0) }
+        function onIconStyleChanged()        { root.refreshIcons() }
+        function onTextScaleChanged()        { root.lastSentHeight = -1 }
+        function onRowHeightChanged()        { root.lastSentHeight = -1 }
+        function onSeparatorHeightChanged()  { root.lastSentHeight = -1 }
+        function onProgressHeightChanged()   { root.lastSentHeight = -1 }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
@@ -401,7 +402,7 @@ PlasmoidItem {
                 Layout.fillHeight: true
                 clip:              true
                 model:             drives
-                spacing:           0
+                spacing:           root.sepH
                 boundsBehavior:    Flickable.StopAtBounds
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
@@ -409,6 +410,9 @@ PlasmoidItem {
                         ? QQC2.ScrollBar.AsNeeded
                         : QQC2.ScrollBar.AlwaysOff
                 }
+
+                // Тонкий сепаратор между элементами — рисуется в footer каждого делегата
+                // через spacing ListView + полоса в самом делегате (без footerItem, чтобы не рисовать после последнего)
 
                 delegate: QQC2.ItemDelegate {
                     required property string title
@@ -422,6 +426,7 @@ PlasmoidItem {
                     required property string driveIcon
                     required property string kname
                     required property bool   active
+                    required property int    index
 
                     width:  list.width - (list.contentHeight > list.height
                                 ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
@@ -434,16 +439,31 @@ PlasmoidItem {
                     QQC2.ToolTip.text:   source + "\n" + target
                     QQC2.ToolTip.delay:  600
 
-                    background: Rectangle {
-                        color: parent.hovered
-                            ? Qt.rgba(
-                                Kirigami.Theme.highlightColor.r,
-                                Kirigami.Theme.highlightColor.g,
-                                Kirigami.Theme.highlightColor.b, 0.12)
-                            : "transparent"
-                        radius: Plasmoid.configuration.rounded
-                            ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad) : 0
-                        Behavior on color { ColorAnimation { duration: 120 } }
+                    background: Item {
+                        // Сепаратор над элементом (не после первого)
+                        Rectangle {
+                            visible: root.sepH > 0 && index > 0
+                            width:   parent.width
+                            height:  root.sepH
+                            y:       -root.sepH
+                            color:   Qt.rgba(
+                                view.labelColor.r,
+                                view.labelColor.g,
+                                view.labelColor.b, 0.12)
+                        }
+                        // Фон ховера
+                        Rectangle {
+                            anchors.fill: parent
+                            color: parent.parent.hovered
+                                ? Qt.rgba(
+                                    Kirigami.Theme.highlightColor.r,
+                                    Kirigami.Theme.highlightColor.g,
+                                    Kirigami.Theme.highlightColor.b, 0.12)
+                                : "transparent"
+                            radius: Plasmoid.configuration.rounded
+                                ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad) : 0
+                            Behavior on color { ColorAnimation { duration: 120 } }
+                        }
                     }
 
                     contentItem: RowLayout {

@@ -16,6 +16,7 @@ QQC2.ScrollView {
     property string cfg_language
     property bool   cfg_autoFit
     property int    cfg_rowHeight
+    property int    cfg_separatorHeight
     property int    cfg_textScale
     property int    cfg_progressHeight
     property int    cfg_maxHeight
@@ -46,6 +47,7 @@ QQC2.ScrollView {
     property string cfg_languageDefault:            "ru"
     property bool   cfg_autoFitDefault:             true
     property int    cfg_rowHeightDefault:           112
+    property int    cfg_separatorHeightDefault:     1
     property int    cfg_textScaleDefault:           100
     property int    cfg_progressHeightDefault:      8
     property int    cfg_maxHeightDefault:           720
@@ -103,6 +105,13 @@ QQC2.ScrollView {
             textFromValue: function(v) { return v + " px" }
             valueFromText: function(t) { return parseInt(t) || 108 }
             onValueModified: page.cfg_rowHeight = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Разделитель:", "Separator:")
+            from: 0; to: 16; stepSize: 1; value: page.cfg_separatorHeight
+            textFromValue: function(v) { return v === 0 ? page.tr2("выключён", "off") : v + " px" }
+            valueFromText: function(t) { return parseInt(t) || 0 }
+            onValueModified: page.cfg_separatorHeight = value
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Масштаб текста:", "Text scale:")
