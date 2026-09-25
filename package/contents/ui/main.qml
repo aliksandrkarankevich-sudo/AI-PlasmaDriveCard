@@ -25,13 +25,13 @@ PlasmoidItem {
         )
     )
 
-    // Авторазмер: Plasmoid в Plasma 6 — это и есть DriveCardApplet (Q_PROPERTY plasmoid READ applet).
-    // setPreferredSize() — Q_INVOKABLE на нём, вызываем напрямую.
+    // Авторазмер: root.plasmoid — это AppletQuickItem::applet(), т.е. наш DriveCardApplet.
+    // setPreferredSize() — Q_INVOKABLE на DriveCardApplet, вызываем через root.plasmoid.
     onWantedHeightChanged: {
         console.log("[DC] wanted=", wantedHeight, "count=", drives.count,
                     "root.h=", root.height, "autoFit=", Plasmoid.configuration.autoFit)
         if (Plasmoid.configuration.autoFit)
-            Plasmoid.setPreferredSize(root.width, wantedHeight)
+            root.plasmoid.setPreferredSize(root.width, wantedHeight)
     }
 
     property bool scanRunning:    false
@@ -39,20 +39,20 @@ PlasmoidItem {
     property bool pendingRefresh:  false
     property var  previousIo:      ({})
 
-    // driveCount — Q_PROPERTY на DriveCardApplet, пишем напрямую
+    // driveCount — Q_PROPERTY на DriveCardApplet
     Binding {
-        target:   Plasmoid
+        target:   root.plasmoid
         property: "driveCount"
         value:    drives.count
     }
 
     Connections {
-        target: Plasmoid
+        target: root.plasmoid
         ignoreUnknownSignals: true
         function onDeviceMounted() { root.refresh(0) }
         function onDeviceRemoved() { root.refresh(0) }
         function onSuspendedChanged() {
-            suspendedOverlay.visible = Plasmoid.suspended
+            suspendedOverlay.visible = root.plasmoid.suspended
         }
     }
 
@@ -118,7 +118,7 @@ PlasmoidItem {
         var marker      = "__DC_LSBLK__"
         var markerIndex = output.indexOf(marker)
         if (markerIndex < 0) {
-            Plasmoid.reportResult(false)
+            root.plasmoid.reportResult(false)
             return
         }
         var findmntData, lsblkData
@@ -127,7 +127,7 @@ PlasmoidItem {
             lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
-            Plasmoid.reportResult(false)
+            root.plasmoid.reportResult(false)
             return
         }
         var map    = ({})
@@ -175,7 +175,7 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
-        Plasmoid.reportResult(true)
+        root.plasmoid.reportResult(true)
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
