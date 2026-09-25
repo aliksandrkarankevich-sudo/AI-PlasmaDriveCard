@@ -25,18 +25,13 @@ PlasmoidItem {
         )
     )
 
+    // Авторазмер: Plasmoid в Plasma 6 — это и есть DriveCardApplet (Q_PROPERTY plasmoid READ applet).
+    // setPreferredSize() — Q_INVOKABLE на нём, вызываем напрямую.
     onWantedHeightChanged: {
-        console.log("[DC] wanted=", wantedHeight,
-                    "count=", drives.count,
-                    "root.h before=", root.height,
-                    "hasApplet=", root.hasApplet,
-                    "autoFit=", Plasmoid.configuration.autoFit)
-        if (root.hasApplet && Plasmoid.configuration.autoFit) {
-            root.applet.setPreferredSize(root.width, root.wantedHeight)
-            Qt.callLater(function() {
-                console.log("[DC] root.h after setPreferredSize=", root.height)
-            })
-        }
+        console.log("[DC] wanted=", wantedHeight, "count=", drives.count,
+                    "root.h=", root.height, "autoFit=", Plasmoid.configuration.autoFit)
+        if (Plasmoid.configuration.autoFit)
+            Plasmoid.setPreferredSize(root.width, wantedHeight)
     }
 
     property bool scanRunning:    false
@@ -44,31 +39,20 @@ PlasmoidItem {
     property bool pendingRefresh:  false
     property var  previousIo:      ({})
 
-    // ── C++ backend ──────────────────────────────────────────────────────────
-    readonly property var  applet:    (typeof Plasmoid.nativeInterface !== "undefined")
-                                          ? Plasmoid.nativeInterface : null
-    readonly property bool hasApplet: applet !== null && applet !== undefined
-
+    // driveCount — Q_PROPERTY на DriveCardApplet, пишем напрямую
     Binding {
-        target:   root.hasApplet ? root.applet : null
+        target:   Plasmoid
         property: "driveCount"
         value:    drives.count
-        when:     root.hasApplet
     }
 
     Connections {
-        target: root.hasApplet ? root.applet : null
+        target: Plasmoid
         ignoreUnknownSignals: true
         function onDeviceMounted() { root.refresh(0) }
         function onDeviceRemoved() { root.refresh(0) }
-    }
-
-    Connections {
-        target: root.hasApplet ? root.applet : null
-        ignoreUnknownSignals: true
         function onSuspendedChanged() {
-            if (root.hasApplet)
-                suspendedOverlay.visible = root.applet.suspended
+            suspendedOverlay.visible = Plasmoid.suspended
         }
     }
 
@@ -134,7 +118,7 @@ PlasmoidItem {
         var marker      = "__DC_LSBLK__"
         var markerIndex = output.indexOf(marker)
         if (markerIndex < 0) {
-            if (root.hasApplet) root.applet.reportResult(false)
+            Plasmoid.reportResult(false)
             return
         }
         var findmntData, lsblkData
@@ -143,7 +127,7 @@ PlasmoidItem {
             lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
-            if (root.hasApplet) root.applet.reportResult(false)
+            Plasmoid.reportResult(false)
             return
         }
         var map    = ({})
@@ -191,7 +175,7 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
-        if (root.hasApplet) root.applet.reportResult(true)
+        Plasmoid.reportResult(true)
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
