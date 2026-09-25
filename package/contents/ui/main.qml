@@ -36,6 +36,17 @@ PlasmoidItem {
         when: root.hasApplet
     }
 
+    // ── Авторазмер — единственный механизм ────────────────────────────────────────
+    // setPreferredSize вызывается один раз, прямо с целевым значением.
+    // Никаких сбросов в 1px, никаких двойных callLater.
+    function applySize() {
+        if (!Plasmoid.configuration.autoFit || !root.hasApplet) return
+        root.applet.setPreferredSize(root.width, root.wantedHeight)
+    }
+
+    onWantedHeightChanged: applySize()
+    onWidthChanged:        applySize()
+
     // Solid hotplug
     Connections {
         target: root.hasApplet ? root.applet : null
@@ -54,7 +65,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Layout hints ─────────────────────────────────────────────────────────────────
+    // ── Layout hints (запасные, когда C++ недоступен) ───────────────────────────
     Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
     Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
     Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : Kirigami.Units.gridUnit * 13
@@ -269,12 +280,7 @@ PlasmoidItem {
     // ── Full representation ──────────────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
-
-        // implicitHeight — единственный источник истины для авторазмера.
-        // Plasma 6 читает это значение напрямую и масштабирует виджет
-        // симметрично: и вверх, и вниз.
-        implicitWidth:  Kirigami.Units.gridUnit * 29
-        implicitHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : -1
+        implicitWidth: Kirigami.Units.gridUnit * 29
 
         readonly property color backgroundBase: Plasmoid.configuration.backgroundColorMode === "custom"
             ? Plasmoid.configuration.backgroundColor : Kirigami.Theme.backgroundColor
