@@ -36,11 +36,12 @@ PlasmoidItem {
         when: root.hasApplet
     }
 
-    // ── Авторазмер — единственный механизм ────────────────────────────────────────
-    // setPreferredSize вызывается один раз, прямо с целевым значением.
-    // Никаких сбросов в 1px, никаких двойных callLater.
+    // ── Авторазмер ───────────────────────────────────────────────────────────────────
+    // Гуард: не вызываем пока width=0 (начальная инициализация виджета)
     function applySize() {
-        if (!Plasmoid.configuration.autoFit || !root.hasApplet) return
+        if (!Plasmoid.configuration.autoFit) return
+        if (!root.hasApplet) return
+        if (root.width <= 0) return
         root.applet.setPreferredSize(root.width, root.wantedHeight)
     }
 
@@ -188,6 +189,8 @@ PlasmoidItem {
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
         if (root.hasApplet) root.applet.reportResult(true)
+        // После первого заполнения списка — точно знаем width, применяем размер
+        Qt.callLater(root.applySize)
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
