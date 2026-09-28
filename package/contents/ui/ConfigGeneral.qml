@@ -13,7 +13,7 @@ QQC2.ScrollView {
 
     property string cfg_language
     property bool   cfg_autoFit
-    property int    cfg_rowHeight
+    property int    cfg_rowPaddingV
     property int    cfg_separatorHeight
     property int    cfg_textScale
     property int    cfg_progressHeight
@@ -43,7 +43,7 @@ QQC2.ScrollView {
 
     property string cfg_languageDefault:            "ru"
     property bool   cfg_autoFitDefault:             true
-    property int    cfg_rowHeightDefault:           112
+    property int    cfg_rowPaddingVDefault:         10
     property int    cfg_separatorHeightDefault:     4
     property int    cfg_textScaleDefault:           100
     property int    cfg_progressHeightDefault:      8
@@ -74,6 +74,19 @@ QQC2.ScrollView {
     readonly property bool ru: cfg_language !== "en"
     function tr2(ruText, enText) { return ru ? ruText : enText }
 
+    // Вычисление реальной высоты строки (повторяет формулу из main.qml)
+    readonly property int _smallSp: 4   // приближение Kirigami.Units.smallSpacing
+    function _fontPx(base) {
+        return Math.max(8, Math.round(base * cfg_textScale / 100.0))
+    }
+    readonly property int _rowPadV: Math.max(4, cfg_rowPaddingV)
+    readonly property int _rowGapV: _smallSp
+    readonly property int _effectiveRowH:
+        _rowPadV * 2
+        + _fontPx(18) + _fontPx(16) + _fontPx(13)
+        + _fontPx(13) + Math.max(2, cfg_progressHeight)
+        + _rowGapV * 4
+
     Kirigami.FormLayout {
         width: page.availableWidth
         implicitHeight: childrenRect.height + 48
@@ -98,12 +111,20 @@ QQC2.ScrollView {
             checked: page.cfg_autoFit
             onToggled: page.cfg_autoFit = checked
         }
-        QQC2.SpinBox {
+
+        // Высота строки — только для чтения, показывает реальное значение
+        QQC2.Label {
             Kirigami.FormData.label: page.tr2("Высота строки:", "Row height:")
-            from: 72; to: 240; stepSize: 4; value: page.cfg_rowHeight
+            text: page._effectiveRowH + " px  " + page.tr2("(авто)", "(auto)")
+            opacity: 0.65
+        }
+
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Отступ строки:", "Row padding:")
+            from: 4; to: 40; stepSize: 2; value: page.cfg_rowPaddingV
             textFromValue: function(v) { return v + " px" }
-            valueFromText: function(t) { return parseInt(t) || 112 }
-            onValueModified: page.cfg_rowHeight = value
+            valueFromText: function(t) { return parseInt(t) || 10 }
+            onValueModified: page.cfg_rowPaddingV = value
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Отступ между дисками:", "Gap between drives:")
