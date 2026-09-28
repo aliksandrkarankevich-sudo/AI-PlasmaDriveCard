@@ -17,16 +17,19 @@ PlasmoidItem {
     readonly property int  rowH: Plasmoid.configuration.rowHeight
     readonly property int  sepH: Plasmoid.configuration.separatorHeight
 
-    // Минимальная высота строки с учётом текущего шрифта и толщины полосы
+    // Константы внутреннего отступа в строке делегата
+    readonly property int rowPadV: Kirigami.Units.smallSpacing * 2   // сверху + снизу
+    readonly property int rowGapV: Kirigami.Units.smallSpacing        // между элементами
+
+    // Высота строки: текст + полоса + зазоры + паддинг. Не меньше cfg.rowHeight.
     readonly property int effectiveRowH: Math.max(
         rowH,
-        fontPx(18) + fontPx(16) + fontPx(13) + fontPx(13)
-            + Plasmoid.configuration.progressHeight
-            + Kirigami.Units.smallSpacing * 5
-            + Kirigami.Units.largeSpacing
+        rowPadV * 2
+            + fontPx(18) + fontPx(16) + fontPx(13)
+            + fontPx(13) + Plasmoid.configuration.progressHeight
+            + rowGapV * 4
     )
 
-    // Полная высота виджета: заголовок + строки + пробелы + паддинг
     readonly property int wantedHeight: Math.max(
         Kirigami.Units.gridUnit * 9,
         Math.min(
@@ -369,7 +372,6 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing:         Kirigami.Units.smallSpacing
 
-            // ── Заголовок ──────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth:       true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -393,14 +395,12 @@ PlasmoidItem {
                 }
             }
 
-            // ── Список ───────────────────────────────────────────────
             ListView {
                 id:             list
                 Layout.fillWidth:  true
                 Layout.fillHeight: true
                 clip:              true
                 model:             drives
-                // spacing = невидимый зазор-разделитель между делегатами
                 spacing:           root.sepH
                 boundsBehavior:    Flickable.StopAtBounds
 
@@ -426,9 +426,11 @@ PlasmoidItem {
 
                     width:  list.width - (list.contentHeight > list.height
                                 ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
+                    // Высота строго равна effectiveRowH — контент не выходит за её предел
                     height: root.effectiveRowH
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
+                    clip:    true
                     onClicked: root.openTarget(target)
 
                     QQC2.ToolTip.visible: hovered
@@ -451,17 +453,19 @@ PlasmoidItem {
                         anchors.fill:        parent
                         anchors.leftMargin:  Kirigami.Units.smallSpacing
                         anchors.rightMargin: Kirigami.Units.largeSpacing
-                        spacing:             Kirigami.Units.largeSpacing
+                        // верхний/нижний внутренний отступ через margins
+                        anchors.topMargin:    root.rowPadV
+                        anchors.bottomMargin: root.rowPadV
+                        spacing:              Kirigami.Units.largeSpacing
 
-                        // ── Иконка ────────────────────────────────────────
+                        // ─ Иконка ─────────────────────────────────────────
                         Item {
                             Layout.preferredWidth:  Math.min(
                                 Kirigami.Units.iconSizes.medium,
-                                root.effectiveRowH - Kirigami.Units.largeSpacing * 2)
+                                root.effectiveRowH - root.rowPadV * 2)
                             Layout.preferredHeight: Layout.preferredWidth
                             Layout.alignment:       Qt.AlignVCenter
                             Kirigami.Icon { anchors.fill: parent; source: driveIcon }
-                            // Индикатор активности
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
                                 width:   Kirigami.Units.smallSpacing * 2
@@ -475,24 +479,19 @@ PlasmoidItem {
                             }
                         }
 
-                        // ── Текстовой блок ──────────────────────────────
+                        // ─ Текст + полоса ────────────────────────────────
                         ColumnLayout {
                             Layout.fillWidth:  true
                             Layout.fillHeight: true
-                            Layout.alignment:  Qt.AlignVCenter
-                            spacing: Kirigami.Units.smallSpacing / 2
+                            spacing: root.rowGapV
 
-                            // Текст прижат к верхней половине строки;
-                            // полоса + процент — к нижней. fillHeight снизу держит
-                            // зазор между текстом и полосой фиксированным.
                             PC3.Label {
                                 text:           title
                                 color:          view.labelColor
                                 font.bold:      true
                                 font.pixelSize: root.fontPx(18)
                                 elide:          Text.ElideRight
-                                Layout.fillWidth:    true
-                                Layout.topMargin:    Kirigami.Units.smallSpacing
+                                Layout.fillWidth: true
                             }
                             PC3.Label {
                                 text: root.formatBytes(available) + " "
@@ -518,7 +517,7 @@ PlasmoidItem {
                                 Layout.fillWidth: true
                             }
 
-                            // Процент + полоса прижаты к низу
+                            // Процент + полоса — прижаты к низу через fillHeight
                             Item { Layout.fillHeight: true }
 
                             RowLayout {
@@ -531,12 +530,12 @@ PlasmoidItem {
                                     font.pixelSize: root.fontPx(13)
                                 }
                             }
+                            // Полоса: высота строго зафиксирована, clip=true — не вылезает
                             Item {
                                 Layout.fillWidth:       true
                                 Layout.preferredHeight: Math.max(
                                     Kirigami.Units.smallSpacing,
                                     Plasmoid.configuration.progressHeight)
-                                Layout.bottomMargin: Kirigami.Units.smallSpacing
                                 clip: true
                                 QQC2.ProgressBar {
                                     anchors.left:           parent.left

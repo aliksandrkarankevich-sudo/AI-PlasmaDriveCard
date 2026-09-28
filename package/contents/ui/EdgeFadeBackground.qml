@@ -1,53 +1,35 @@
 // EdgeFadeBackground.qml
 // Canvas-based edge-fade background without visible seams.
 //
-// Rendering strategy (seam-free):
+// Rendering strategy:
 //   1. Fill entire canvas with centerAlpha (solid base).
-//   2. Paint edge bands on TOP using "destination-out" composite operation.
-//      destination-out erases alpha from the already-painted base —
-//      result alpha = base_alpha * (1 - src_alpha). No colour added, only
-//      transparency punched through. Gradients go from transparent (at the
-//      centre boundary) to opaque-enough-to-reach-edgeAlpha (at the edge).
-//   3. Corners get the same treatment via radialGradient.
-//   4. Restore composite mode to "source-over" for any future layers.
-//
-// Because we only erase, adjacent zones (side + corner) never double-paint
-// colour — there are no RGB seams regardless of baseColor or alpha values.
-//
-// NOTE (future): A QSB-compiled ShaderEffect would deliver the same quality
-// at GPU cost (zero CPU) and supports animations without requestPaint().
+//   2. Use destination-out to erase alpha toward the edges.
+//      Sides: linearGradient from centre-boundary (erase=0) to edge (erase=max).
+//      Corners: radialGradient from corner-centre (r=0, erase=0) outward to (r=fw, erase=max).
+//      This means the INNER part of the corner stays opaque, the OUTER corner fades.
+//   3. Restore composite mode.
 
 import QtQuick
 
 Item {
     id: root
 
-    // ── Public API ───────────────────────────────────────────────────────
     property color baseColor:   "black"
-    property real  centerAlpha: 0.4     // alpha of the solid center region
-    property real  edgeAlpha:   1.0     // 1.0 = fully transparent edge
-    property real  fadeWidth:   30      // px from each edge
-    property real  curve:       0.0     // -1..+1, controls gradient falloff
-    property real  radius:      0       // corner radius, px
+    property real  centerAlpha: 0.4
+    property real  edgeAlpha:   1.0     // 1.0 = edge fully transparent
+    property real  fadeWidth:   30
+    property real  curve:       0.0     // -1..+1
+    property real  radius:      0
 
-    // ── Internal ────────────────────────────────────────────────────────
     readonly property real _fw:  Math.max(0, Math.min(fadeWidth, Math.min(width, height) * 0.45))
     readonly property real _ea:  Math.max(0.0, Math.min(1.0, edgeAlpha))
     readonly property real _exp: Math.max(0.25, 2.0 + curve * 2.0)
 
-    function _rgba(r, g, b, a) {
-        return "rgba(" + r + "," + g + "," + b + "," + Math.max(0, Math.min(1, a)) + ")"
-    }
-
-    // Erase-alpha at position t∈[0,1] where 0=centre-boundary, 1=outer-edge.
-    // Returns the alpha to punch OUT of the base via destination-out.
-    // At t=0 we erase nothing (0); at t=1 we erase enough to land on edgeAlpha.
+    // How much alpha to erase at position t∈[0,1], t=0 = centre-boundary, t=1 = outer edge
     function _eraseAlpha(t) {
-        var s        = Math.pow(Math.max(0, Math.min(1, t)), _exp)
-        // target alpha at this position
-        var targetA  = centerAlpha * (1.0 - _ea) + (1.0 - s) * (centerAlpha - centerAlpha * (1.0 - _ea))
-        // We need: base * (1 - eraseA) = targetA  =>  eraseA = 1 - targetA/base
         if (centerAlpha <= 0) return 0
+        var s       = Math.pow(Math.max(0, Math.min(1, t)), _exp)
+        var targetA = centerAlpha * (1.0 - _ea * s)
         return Math.max(0, Math.min(1, 1.0 - targetA / centerAlpha))
     }
 
@@ -67,7 +49,7 @@ Item {
 
             ctx.clearRect(0, 0, w, h)
 
-            // ── 1. Clip to rounded rect ─────────────────────────────────
+            // ─ 1. Clip to rounded rect ──────────────────────────────────────
             if (r > 0) {
                 ctx.save()
                 ctx.beginPath()
@@ -85,71 +67,70 @@ Item {
                 ctx.clip()
             }
 
-            // ── 2. Base fill ──────────────────────────────────────────
+            // ─ 2. Base fill ──────────────────────────────────────────────
             ctx.globalCompositeOperation = "source-over"
-            ctx.fillStyle = root._rgba(br, bg, bb, root.centerAlpha)
+            ctx.fillStyle = "rgba(" + br + "," + bg + "," + bb + "," + root.centerAlpha + ")"
             ctx.fillRect(0, 0, w, h)
 
             if (fw > 0 && root._ea > 0) {
-                // ── 3. Erase edges via destination-out ──────────────────
                 ctx.globalCompositeOperation = "destination-out"
-
                 var steps = 10
-                var i, t, a, g
+                var i, t, g
 
-                // Helper: build an erase gradient with stops
-                function eraseGrad(grad, fromCentre) {
+                // Build erase gradient: stop i/steps at t = i/steps (t=0 no erase, t=1 max erase)
+                function eraseGrad(grad) {
                     for (i = 0; i <= steps; i++) {
-                        // fromCentre=true: stop 0 at centre-boundary (t=0), stop N at edge (t=1)
-                        t = fromCentre ? i / steps : 1.0 - i / steps
-                        a = root._eraseAlpha(t)
-                        grad.addColorStop(i / steps, "rgba(0,0,0," + a + ")")
+                        t = i / steps
+                        grad.addColorStop(t, "rgba(0,0,0," + root._eraseAlpha(t) + ")")
                     }
                     return grad
                 }
 
-                // Top
+                // Sides: gradient goes from inner edge (t=0) to outer edge (t=1)
+                // Top: inner boundary at y=fw, outer at y=0
                 g = ctx.createLinearGradient(0, fw, 0, 0)
-                eraseGrad(g, true)
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(fw, 0, w - fw * 2, fw)
 
-                // Bottom
+                // Bottom: inner at y=h-fw, outer at y=h
                 g = ctx.createLinearGradient(0, h - fw, 0, h)
-                eraseGrad(g, true)
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(fw, h - fw, w - fw * 2, fw)
 
-                // Left
+                // Left: inner at x=fw, outer at x=0
                 g = ctx.createLinearGradient(fw, 0, 0, 0)
-                eraseGrad(g, true)
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(0, fw, fw, h - fw * 2)
 
-                // Right
+                // Right: inner at x=w-fw, outer at x=w
                 g = ctx.createLinearGradient(w - fw, 0, w, 0)
-                eraseGrad(g, true)
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(w - fw, fw, fw, h - fw * 2)
 
-                // Top-left corner
+                // Corners: radialGradient from corner-centre outward.
+                // r=0 (centre of corner zone) → t=0 (no erase = opaque)
+                // r=fw (outer corner edge)     → t=1 (max erase = transparent)
+                // Top-left
                 g = ctx.createRadialGradient(fw, fw, 0, fw, fw, fw)
-                eraseGrad(g, false)  // radial: 0=centre-of-corner(=centre boundary), fw=edge
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(0, 0, fw, fw)
 
-                // Top-right corner
+                // Top-right
                 g = ctx.createRadialGradient(w - fw, fw, 0, w - fw, fw, fw)
-                eraseGrad(g, false)
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(w - fw, 0, fw, fw)
 
-                // Bottom-left corner
+                // Bottom-left
                 g = ctx.createRadialGradient(fw, h - fw, 0, fw, h - fw, fw)
-                eraseGrad(g, false)
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(0, h - fw, fw, fw)
 
-                // Bottom-right corner
+                // Bottom-right
                 g = ctx.createRadialGradient(w - fw, h - fw, 0, w - fw, h - fw, fw)
-                eraseGrad(g, false)
+                eraseGrad(g)
                 ctx.fillStyle = g; ctx.fillRect(w - fw, h - fw, fw, fw)
             }
 
-            // ── 4. Restore composite mode ────────────────────────────
             ctx.globalCompositeOperation = "source-over"
             if (r > 0) ctx.restore()
         }
