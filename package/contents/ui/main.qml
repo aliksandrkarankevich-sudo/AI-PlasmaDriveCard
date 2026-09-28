@@ -17,11 +17,10 @@ PlasmoidItem {
     readonly property int  rowH: Plasmoid.configuration.rowHeight
     readonly property int  sepH: Plasmoid.configuration.separatorHeight
 
-    // Константы внутреннего отступа в строке делегата
-    readonly property int rowPadV: Kirigami.Units.smallSpacing * 2   // сверху + снизу
-    readonly property int rowGapV: Kirigami.Units.smallSpacing        // между элементами
+    readonly property int rowPadV: Kirigami.Units.smallSpacing * 2
+    readonly property int rowGapV: Kirigami.Units.smallSpacing
 
-    // Высота строки: текст + полоса + зазоры + паддинг. Не меньше cfg.rowHeight.
+    // Высота строки: паддинг + 4 строки текста + полоса + 4 зазора
     readonly property int effectiveRowH: Math.max(
         rowH,
         rowPadV * 2
@@ -81,7 +80,7 @@ PlasmoidItem {
         function onCountChanged() { root.lastSentHeight = -1 }
     }
 
-    // ── Functions ────────────────────────────────────────────────────────────
+    // ── Functions ─────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) {
         return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
@@ -235,7 +234,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Commands ─────────────────────────────────────────────────────────────
+    // ── Commands ──────────────────────────────────────────────────────────────
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript:
         "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
@@ -245,7 +244,7 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Data source ───────────────────────────────────────────────────────────
+    // ── Data source ────────────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -267,7 +266,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Timers ────────────────────────────────────────────────────────────────
+    // ── Timers ─────────────────────────────────────────────────────────────────
     Timer {
         interval:  Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat:    true
@@ -288,7 +287,7 @@ PlasmoidItem {
         onTriggered: root.refresh(0)
     }
 
-    // ── Config watchers ───────────────────────────────────────────────────────
+    // ── Config watchers ────────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()        { root.refresh(0) }
@@ -302,7 +301,7 @@ PlasmoidItem {
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ───────────────────────────────────────────────────
+    // ── Full representation ────────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
 
@@ -372,6 +371,7 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing:         Kirigami.Units.smallSpacing
 
+            // ── Заголовок ────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth:       true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -395,6 +395,7 @@ PlasmoidItem {
                 }
             }
 
+            // ── Список дисков ────────────────────────────────────────────
             ListView {
                 id:             list
                 Layout.fillWidth:  true
@@ -426,11 +427,10 @@ PlasmoidItem {
 
                     width:  list.width - (list.contentHeight > list.height
                                 ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
-                    // Высота строго равна effectiveRowH — контент не выходит за её предел
                     height: root.effectiveRowH
                     padding: 0; leftPadding: 0; rightPadding: 0
                     topPadding: 0; bottomPadding: 0
-                    clip:    true
+                    clip: true
                     onClicked: root.openTarget(target)
 
                     QQC2.ToolTip.visible: hovered
@@ -450,10 +450,9 @@ PlasmoidItem {
                     }
 
                     contentItem: RowLayout {
-                        anchors.fill:        parent
-                        anchors.leftMargin:  Kirigami.Units.smallSpacing
-                        anchors.rightMargin: Kirigami.Units.largeSpacing
-                        // верхний/нижний внутренний отступ через margins
+                        anchors.fill:         parent
+                        anchors.leftMargin:   Kirigami.Units.smallSpacing
+                        anchors.rightMargin:  Kirigami.Units.largeSpacing
                         anchors.topMargin:    root.rowPadV
                         anchors.bottomMargin: root.rowPadV
                         spacing:              Kirigami.Units.largeSpacing
@@ -479,7 +478,7 @@ PlasmoidItem {
                             }
                         }
 
-                        // ─ Текст + полоса ────────────────────────────────
+                        // ─ Текст + полоса ─────────────────────────────────
                         ColumnLayout {
                             Layout.fillWidth:  true
                             Layout.fillHeight: true
@@ -517,9 +516,10 @@ PlasmoidItem {
                                 Layout.fillWidth: true
                             }
 
-                            // Процент + полоса — прижаты к низу через fillHeight
+                            // Спейсер — прижимает процент+полосу к низу
                             Item { Layout.fillHeight: true }
 
+                            // Строка с процентом
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
@@ -530,24 +530,45 @@ PlasmoidItem {
                                     font.pixelSize: root.fontPx(13)
                                 }
                             }
-                            // Полоса: высота строго зафиксирована, clip=true — не вылезает
+
+                            // ── Полоса прогресса (вместо QQC2.ProgressBar) ──
+                            // Два Rectangle: трек (фон) + заливка (прогресс).
+                            // Высота = progressHeight строго, радиус = половина высоты (pill).
+                            // Никакой зависимости от стиля темы.
                             Item {
                                 Layout.fillWidth:       true
-                                Layout.preferredHeight: Math.max(
-                                    Kirigami.Units.smallSpacing,
-                                    Plasmoid.configuration.progressHeight)
-                                clip: true
-                                QQC2.ProgressBar {
-                                    anchors.left:           parent.left
-                                    anchors.right:          parent.right
+                                Layout.preferredHeight: Math.max(2, Plasmoid.configuration.progressHeight)
+
+                                readonly property int   ph: Math.max(2, Plasmoid.configuration.progressHeight)
+                                readonly property real  fillW: width * Math.max(0, Math.min(100, used)) / 100.0
+                                readonly property color fillColor:
+                                    used >= Plasmoid.configuration.criticalPercent
+                                        ? Kirigami.Theme.negativeTextColor
+                                        : used >= Plasmoid.configuration.warningPercent
+                                            ? Kirigami.Theme.neutralTextColor
+                                            : Kirigami.Theme.highlightColor
+
+                                // Трек (фоновая дорожка)
+                                Rectangle {
+                                    anchors.left:   parent.left
+                                    anchors.right:  parent.right
                                     anchors.verticalCenter: parent.verticalCenter
-                                    from: 0; to: 100; value: used
-                                    palette.highlight:
-                                        used >= Plasmoid.configuration.criticalPercent
-                                            ? Kirigami.Theme.negativeTextColor
-                                            : used >= Plasmoid.configuration.warningPercent
-                                                ? Kirigami.Theme.neutralTextColor
-                                                : Kirigami.Theme.highlightColor
+                                    height: parent.ph
+                                    radius: parent.ph / 2
+                                    color:  Qt.rgba(
+                                        parent.fillColor.r,
+                                        parent.fillColor.g,
+                                        parent.fillColor.b, 0.20)
+                                }
+                                // Заливка (прогресс)
+                                Rectangle {
+                                    anchors.left:   parent.left
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width:  Math.max(parent.ph, parent.fillW)  // минимум pill-радиус
+                                    height: parent.ph
+                                    radius: parent.ph / 2
+                                    color:  parent.fillColor
+                                    Behavior on width { SmoothedAnimation { velocity: 120 } }
                                 }
                             }
                         }
