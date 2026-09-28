@@ -14,20 +14,20 @@ PlasmoidItem {
 
     readonly property bool ru:   Plasmoid.configuration.language !== "en"
     readonly property int  pad:  Plasmoid.configuration.contentPadding
-    readonly property int  rowH: Plasmoid.configuration.rowHeight
     readonly property int  sepH: Plasmoid.configuration.separatorHeight
 
-    readonly property int rowPadV: Kirigami.Units.smallSpacing * 2
+    // Вертикальный внутренний отступ строки (сверху + снизу, симметрично)
+    readonly property int rowPadV: Math.max(4, Plasmoid.configuration.rowPaddingV)
+    // Зазор между элементами внутри строки
     readonly property int rowGapV: Kirigami.Units.smallSpacing
 
-    // Высота строки: паддинг + 4 строки текста + полоса + 4 зазора
-    readonly property int effectiveRowH: Math.max(
-        rowH,
+    // Высота строки — только автомат, без ручного ограничения снизу.
+    // Формула: 2×отступ + 4 строки текста + полоса + 4 зазора между ними.
+    readonly property int effectiveRowH:
         rowPadV * 2
-            + fontPx(18) + fontPx(16) + fontPx(13)
-            + fontPx(13) + Plasmoid.configuration.progressHeight
-            + rowGapV * 4
-    )
+        + fontPx(18) + fontPx(16) + fontPx(13)
+        + fontPx(13) + Plasmoid.configuration.progressHeight
+        + rowGapV * 4
 
     readonly property int wantedHeight: Math.max(
         Kirigami.Units.gridUnit * 9,
@@ -80,7 +80,7 @@ PlasmoidItem {
         function onCountChanged() { root.lastSentHeight = -1 }
     }
 
-    // ── Functions ─────────────────────────────────────────────────────────────
+    // ── Functions ────────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) {
         return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
@@ -234,7 +234,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Commands ──────────────────────────────────────────────────────────────
+    // ── Commands ─────────────────────────────────────────────────────────────
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript:
         "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
@@ -244,7 +244,7 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Data source ────────────────────────────────────────────────────────────
+    // ── Data source ───────────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -266,7 +266,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Timers ─────────────────────────────────────────────────────────────────
+    // ── Timers ────────────────────────────────────────────────────────────────
     Timer {
         interval:  Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat:    true
@@ -287,21 +287,21 @@ PlasmoidItem {
         onTriggered: root.refresh(0)
     }
 
-    // ── Config watchers ────────────────────────────────────────────────────────
+    // ── Config watchers ───────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()        { root.refresh(0) }
         function onShowBootChanged()        { root.refresh(0) }
         function onIconStyleChanged()       { root.refreshIcons() }
         function onTextScaleChanged()       { root.lastSentHeight = -1 }
-        function onRowHeightChanged()       { root.lastSentHeight = -1 }
+        function onRowPaddingVChanged()     { root.lastSentHeight = -1 }
         function onSeparatorHeightChanged() { root.lastSentHeight = -1 }
         function onProgressHeightChanged()  { root.lastSentHeight = -1 }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ────────────────────────────────────────────────────
+    // ── Full representation ───────────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
 
@@ -371,7 +371,6 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing:         Kirigami.Units.smallSpacing
 
-            // ── Заголовок ────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth:       true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -395,7 +394,6 @@ PlasmoidItem {
                 }
             }
 
-            // ── Список дисков ────────────────────────────────────────────
             ListView {
                 id:             list
                 Layout.fillWidth:  true
@@ -478,7 +476,7 @@ PlasmoidItem {
                             }
                         }
 
-                        // ─ Текст + полоса ─────────────────────────────────
+                        // ─ Текст + полоса ────────────────────────────────
                         ColumnLayout {
                             Layout.fillWidth:  true
                             Layout.fillHeight: true
@@ -516,10 +514,8 @@ PlasmoidItem {
                                 Layout.fillWidth: true
                             }
 
-                            // Спейсер — прижимает процент+полосу к низу
                             Item { Layout.fillHeight: true }
 
-                            // Строка с процентом
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
@@ -531,10 +527,7 @@ PlasmoidItem {
                                 }
                             }
 
-                            // ── Полоса прогресса (вместо QQC2.ProgressBar) ──
-                            // Два Rectangle: трек (фон) + заливка (прогресс).
-                            // Высота = progressHeight строго, радиус = половина высоты (pill).
-                            // Никакой зависимости от стиля темы.
+                            // ── Полоса прогресса (Rectangle, не QQC2.ProgressBar) ──
                             Item {
                                 Layout.fillWidth:       true
                                 Layout.preferredHeight: Math.max(2, Plasmoid.configuration.progressHeight)
@@ -548,10 +541,9 @@ PlasmoidItem {
                                             ? Kirigami.Theme.neutralTextColor
                                             : Kirigami.Theme.highlightColor
 
-                                // Трек (фоновая дорожка)
                                 Rectangle {
-                                    anchors.left:   parent.left
-                                    anchors.right:  parent.right
+                                    anchors.left:           parent.left
+                                    anchors.right:          parent.right
                                     anchors.verticalCenter: parent.verticalCenter
                                     height: parent.ph
                                     radius: parent.ph / 2
@@ -560,11 +552,10 @@ PlasmoidItem {
                                         parent.fillColor.g,
                                         parent.fillColor.b, 0.20)
                                 }
-                                // Заливка (прогресс)
                                 Rectangle {
-                                    anchors.left:   parent.left
+                                    anchors.left:           parent.left
                                     anchors.verticalCenter: parent.verticalCenter
-                                    width:  Math.max(parent.ph, parent.fillW)  // минимум pill-радиус
+                                    width:  Math.max(parent.ph, parent.fillW)
                                     height: parent.ph
                                     radius: parent.ph / 2
                                     color:  parent.fillColor
