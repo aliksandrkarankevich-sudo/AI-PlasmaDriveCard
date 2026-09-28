@@ -12,21 +12,21 @@ PlasmoidItem {
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
-    readonly property bool ru: Plasmoid.configuration.language !== "en"
+    readonly property bool ru:   Plasmoid.configuration.language !== "en"
     readonly property int  pad:  Plasmoid.configuration.contentPadding
     readonly property int  rowH: Plasmoid.configuration.rowHeight
     readonly property int  sepH: Plasmoid.configuration.separatorHeight
 
-    // Минимальная высота одной строки с учётом текущего шрифта
+    // Минимальная высота строки с учётом текущего шрифта и толщины полосы
     readonly property int effectiveRowH: Math.max(
         rowH,
         fontPx(18) + fontPx(16) + fontPx(13) + fontPx(13)
             + Plasmoid.configuration.progressHeight
-            + Kirigami.Units.smallSpacing * 4
-            + Kirigami.Units.largeSpacing * 2
+            + Kirigami.Units.smallSpacing * 5
+            + Kirigami.Units.largeSpacing
     )
 
-    // Высота всех строк + заголовок + паддинги + сепараторы между строками
+    // Полная высота виджета: заголовок + строки + пробелы + паддинг
     readonly property int wantedHeight: Math.max(
         Kirigami.Units.gridUnit * 9,
         Math.min(
@@ -35,11 +35,10 @@ PlasmoidItem {
                 + Kirigami.Units.gridUnit * 2
                 + Kirigami.Units.smallSpacing
                 + Math.max(1, drives.count) * effectiveRowH
-                + Math.max(0, drives.count - 1) * (sepH > 0 ? sepH : 0)
+                + Math.max(0, drives.count - 1) * sepH
         )
     )
 
-    // Дебаунс: вызываем setPreferredSize только при реальном изменении
     property int lastSentHeight: -1
 
     onWantedHeightChanged: {
@@ -53,7 +52,7 @@ PlasmoidItem {
         })
     }
 
-    property bool scanRunning:    false
+    property bool scanRunning:     false
     property bool activityRunning: false
     property bool pendingRefresh:  false
     property var  previousIo:      ({})
@@ -74,14 +73,13 @@ PlasmoidItem {
         }
     }
 
-    // Сбрасываем lastSentHeight при изменении количества дисков
     Connections {
         target: drives
         function onCountChanged() { root.lastSentHeight = -1 }
     }
 
     // ── Functions ────────────────────────────────────────────────────────────
-    function tr2(r, e)   { return ru ? r : e }
+    function tr2(r, e) { return ru ? r : e }
     function fontPx(base) {
         return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
     }
@@ -127,9 +125,9 @@ PlasmoidItem {
         var name  = node.name || basename(node.path || "")
         var tran  = (node.tran || "").toLowerCase()
         var match = /^nvme(\d+)n\d+$/.exec(name)
-        if (match)                                         return "NVMe " + match[1]
-        if (tran === "usb")                                return "USB " + name
-        if (tran === "sata" || /^sd[a-z]+$/.test(name))   return "SATA " + name
+        if (match)                                        return "NVMe " + match[1]
+        if (tran === "usb")                               return "USB " + name
+        if (tran === "sata" || /^sd[a-z]+$/.test(name))  return "SATA " + name
         return tran ? tran.toUpperCase() + " " + name : tr2("Диск ", "Disk ") + name
     }
     function flatten(items, output) {
@@ -141,10 +139,7 @@ PlasmoidItem {
     function rebuild(output) {
         var marker      = "__DC_LSBLK__"
         var markerIndex = output.indexOf(marker)
-        if (markerIndex < 0) {
-            root.plasmoid.reportResult(false)
-            return
-        }
+        if (markerIndex < 0) { root.plasmoid.reportResult(false); return }
         var findmntData, lsblkData
         try {
             findmntData = JSON.parse(output.substring(0, markerIndex).trim())
@@ -172,8 +167,9 @@ PlasmoidItem {
             var target = fs.target || ""
             var source = cleanSource(fs.source)
             if (!target || source.indexOf("/dev/") !== 0) continue
-            if (!Plasmoid.configuration.showRoot && target === "/")                           continue
-            if (!Plasmoid.configuration.showBoot && (target === "/boot" || target === "/boot/efi")) continue
+            if (!Plasmoid.configuration.showRoot && target === "/") continue
+            if (!Plasmoid.configuration.showBoot &&
+                (target === "/boot" || target === "/boot/efi")) continue
             if (seen[source]) continue
             var size      = Number(fs.size)  || 0
             var available = Number(fs.avail) || 0
@@ -283,7 +279,7 @@ PlasmoidItem {
         onTriggered: root.refreshActivity()
     }
     Timer {
-        id: delayedRefresh
+        id:       delayedRefresh
         interval: 1200
         repeat:   false
         onTriggered: root.refresh(0)
@@ -292,13 +288,13 @@ PlasmoidItem {
     // ── Config watchers ───────────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
-        function onShowRootChanged()         { root.refresh(0) }
-        function onShowBootChanged()         { root.refresh(0) }
-        function onIconStyleChanged()        { root.refreshIcons() }
-        function onTextScaleChanged()        { root.lastSentHeight = -1 }
-        function onRowHeightChanged()        { root.lastSentHeight = -1 }
-        function onSeparatorHeightChanged()  { root.lastSentHeight = -1 }
-        function onProgressHeightChanged()   { root.lastSentHeight = -1 }
+        function onShowRootChanged()        { root.refresh(0) }
+        function onShowBootChanged()        { root.refresh(0) }
+        function onIconStyleChanged()       { root.refreshIcons() }
+        function onTextScaleChanged()       { root.lastSentHeight = -1 }
+        function onRowHeightChanged()       { root.lastSentHeight = -1 }
+        function onSeparatorHeightChanged() { root.lastSentHeight = -1 }
+        function onProgressHeightChanged()  { root.lastSentHeight = -1 }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
@@ -369,12 +365,13 @@ PlasmoidItem {
         }
 
         ColumnLayout {
-            anchors.fill: parent
+            anchors.fill:    parent
             anchors.margins: root.pad
-            spacing: Kirigami.Units.smallSpacing
+            spacing:         Kirigami.Units.smallSpacing
 
+            // ── Заголовок ──────────────────────────────────────────────
             RowLayout {
-                Layout.fillWidth: true
+                Layout.fillWidth:       true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
                 Kirigami.Icon {
                     source: "drive-harddisk"
@@ -382,8 +379,8 @@ PlasmoidItem {
                     Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
                 }
                 PC3.Label {
-                    text: root.tr2("Диски", "Drives")
-                    color: view.labelColor
+                    text:            root.tr2("Диски", "Drives")
+                    color:           view.labelColor
                     font.bold:       true
                     font.pixelSize:  root.fontPx(20)
                     Layout.fillWidth: true
@@ -396,12 +393,14 @@ PlasmoidItem {
                 }
             }
 
+            // ── Список ───────────────────────────────────────────────
             ListView {
-                id: list
+                id:             list
                 Layout.fillWidth:  true
                 Layout.fillHeight: true
                 clip:              true
                 model:             drives
+                // spacing = невидимый зазор-разделитель между делегатами
                 spacing:           root.sepH
                 boundsBehavior:    Flickable.StopAtBounds
 
@@ -410,9 +409,6 @@ PlasmoidItem {
                         ? QQC2.ScrollBar.AsNeeded
                         : QQC2.ScrollBar.AlwaysOff
                 }
-
-                // Тонкий сепаратор между элементами — рисуется в footer каждого делегата
-                // через spacing ListView + полоса в самом делегате (без footerItem, чтобы не рисовать после последнего)
 
                 delegate: QQC2.ItemDelegate {
                     required property string title
@@ -439,31 +435,16 @@ PlasmoidItem {
                     QQC2.ToolTip.text:   source + "\n" + target
                     QQC2.ToolTip.delay:  600
 
-                    background: Item {
-                        // Сепаратор над элементом (не после первого)
-                        Rectangle {
-                            visible: root.sepH > 0 && index > 0
-                            width:   parent.width
-                            height:  root.sepH
-                            y:       -root.sepH
-                            color:   Qt.rgba(
-                                view.labelColor.r,
-                                view.labelColor.g,
-                                view.labelColor.b, 0.12)
-                        }
-                        // Фон ховера
-                        Rectangle {
-                            anchors.fill: parent
-                            color: parent.parent.hovered
-                                ? Qt.rgba(
-                                    Kirigami.Theme.highlightColor.r,
-                                    Kirigami.Theme.highlightColor.g,
-                                    Kirigami.Theme.highlightColor.b, 0.12)
-                                : "transparent"
-                            radius: Plasmoid.configuration.rounded
-                                ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad) : 0
-                            Behavior on color { ColorAnimation { duration: 120 } }
-                        }
+                    background: Rectangle {
+                        color: parent.hovered
+                            ? Qt.rgba(
+                                Kirigami.Theme.highlightColor.r,
+                                Kirigami.Theme.highlightColor.g,
+                                Kirigami.Theme.highlightColor.b, 0.12)
+                            : "transparent"
+                        radius: Plasmoid.configuration.rounded
+                            ? Math.max(2, Plasmoid.configuration.cornerRadius - root.pad) : 0
+                        Behavior on color { ColorAnimation { duration: 120 } }
                     }
 
                     contentItem: RowLayout {
@@ -472,18 +453,20 @@ PlasmoidItem {
                         anchors.rightMargin: Kirigami.Units.largeSpacing
                         spacing:             Kirigami.Units.largeSpacing
 
+                        // ── Иконка ────────────────────────────────────────
                         Item {
                             Layout.preferredWidth:  Math.min(
                                 Kirigami.Units.iconSizes.medium,
                                 root.effectiveRowH - Kirigami.Units.largeSpacing * 2)
                             Layout.preferredHeight: Layout.preferredWidth
-                            Layout.alignment: Qt.AlignVCenter
+                            Layout.alignment:       Qt.AlignVCenter
                             Kirigami.Icon { anchors.fill: parent; source: driveIcon }
+                            // Индикатор активности
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
-                                width:  Kirigami.Units.smallSpacing * 2
-                                height: Kirigami.Units.smallSpacing * 2
-                                radius: Kirigami.Units.smallSpacing
+                                width:   Kirigami.Units.smallSpacing * 2
+                                height:  Kirigami.Units.smallSpacing * 2
+                                radius:  Kirigami.Units.smallSpacing
                                 anchors.right:  parent.right
                                 anchors.bottom: parent.bottom
                                 color:        Kirigami.Theme.positiveTextColor
@@ -492,21 +475,24 @@ PlasmoidItem {
                             }
                         }
 
+                        // ── Текстовой блок ──────────────────────────────
                         ColumnLayout {
                             Layout.fillWidth:  true
                             Layout.fillHeight: true
                             Layout.alignment:  Qt.AlignVCenter
                             spacing: Kirigami.Units.smallSpacing / 2
 
-                            Item { Layout.fillHeight: true }
-
+                            // Текст прижат к верхней половине строки;
+                            // полоса + процент — к нижней. fillHeight снизу держит
+                            // зазор между текстом и полосой фиксированным.
                             PC3.Label {
                                 text:           title
                                 color:          view.labelColor
                                 font.bold:      true
                                 font.pixelSize: root.fontPx(18)
                                 elide:          Text.ElideRight
-                                Layout.fillWidth: true
+                                Layout.fillWidth:    true
+                                Layout.topMargin:    Kirigami.Units.smallSpacing
                             }
                             PC3.Label {
                                 text: root.formatBytes(available) + " "
@@ -531,6 +517,10 @@ PlasmoidItem {
                                 elide:          Text.ElideRight
                                 Layout.fillWidth: true
                             }
+
+                            // Процент + полоса прижаты к низу
+                            Item { Layout.fillHeight: true }
+
                             RowLayout {
                                 Layout.fillWidth: true
                                 spacing: Kirigami.Units.smallSpacing
@@ -542,15 +532,16 @@ PlasmoidItem {
                                 }
                             }
                             Item {
-                                Layout.fillWidth: true
+                                Layout.fillWidth:       true
                                 Layout.preferredHeight: Math.max(
                                     Kirigami.Units.smallSpacing,
                                     Plasmoid.configuration.progressHeight)
+                                Layout.bottomMargin: Kirigami.Units.smallSpacing
                                 clip: true
                                 QQC2.ProgressBar {
-                                    anchors.left:            parent.left
-                                    anchors.right:           parent.right
-                                    anchors.verticalCenter:  parent.verticalCenter
+                                    anchors.left:           parent.left
+                                    anchors.right:          parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
                                     from: 0; to: 100; value: used
                                     palette.highlight:
                                         used >= Plasmoid.configuration.criticalPercent
@@ -560,8 +551,6 @@ PlasmoidItem {
                                                 : Kirigami.Theme.highlightColor
                                 }
                             }
-
-                            Item { Layout.fillHeight: true }
                         }
                     }
                 }
@@ -570,7 +559,7 @@ PlasmoidItem {
                     anchors.centerIn: parent
                     visible:        drives.count === 0
                     text: root.scanRunning
-                        ? root.tr2("Обновление...",            "Refreshing...")
+                        ? root.tr2("Обновление...",             "Refreshing...")
                         : root.tr2("Доступные диски не найдены", "No accessible drives found")
                     color:          view.labelColor
                     opacity:        0.75

@@ -9,10 +9,8 @@ QQC2.ScrollView {
     QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
     QQC2.ScrollBar.vertical.policy: QQC2.ScrollBar.AsNeeded
 
-    // Plasma config framework passes this to identify the page
     property string title
 
-    // Current values
     property string cfg_language
     property bool   cfg_autoFit
     property int    cfg_rowHeight
@@ -43,11 +41,10 @@ QQC2.ScrollView {
     property int    cfg_warningPercent
     property int    cfg_criticalPercent
 
-    // Default values — required by Plasma config framework ("Reset to defaults" button)
     property string cfg_languageDefault:            "ru"
     property bool   cfg_autoFitDefault:             true
     property int    cfg_rowHeightDefault:           112
-    property int    cfg_separatorHeightDefault:     1
+    property int    cfg_separatorHeightDefault:     4
     property int    cfg_textScaleDefault:           100
     property int    cfg_progressHeightDefault:      8
     property int    cfg_maxHeightDefault:           720
@@ -91,8 +88,10 @@ QQC2.ScrollView {
             currentIndex: page.cfg_language === "en" ? 1 : 0
             onActivated: page.cfg_language = currentIndex === 1 ? "en" : "ru"
         }
+
         Kirigami.Separator { Kirigami.FormData.isSection: true }
         Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Размер", "Size") }
+
         QQC2.CheckBox {
             Kirigami.FormData.label: page.tr2("Высота:", "Height:")
             text: page.tr2("Подбирать автоматически", "Fit automatically")
@@ -101,14 +100,14 @@ QQC2.ScrollView {
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Высота строки:", "Row height:")
-            from: 72; to: 180; stepSize: 4; value: page.cfg_rowHeight
+            from: 72; to: 240; stepSize: 4; value: page.cfg_rowHeight
             textFromValue: function(v) { return v + " px" }
-            valueFromText: function(t) { return parseInt(t) || 108 }
+            valueFromText: function(t) { return parseInt(t) || 112 }
             onValueModified: page.cfg_rowHeight = value
         }
         QQC2.SpinBox {
-            Kirigami.FormData.label: page.tr2("Разделитель:", "Separator:")
-            from: 0; to: 16; stepSize: 1; value: page.cfg_separatorHeight
+            Kirigami.FormData.label: page.tr2("Отступ между дисками:", "Gap between drives:")
+            from: 0; to: 32; stepSize: 1; value: page.cfg_separatorHeight
             textFromValue: function(v) { return v === 0 ? page.tr2("выключён", "off") : v + " px" }
             valueFromText: function(t) { return parseInt(t) || 0 }
             onValueModified: page.cfg_separatorHeight = value
@@ -122,7 +121,7 @@ QQC2.ScrollView {
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Толщина полосы:", "Bar thickness:")
-            from: 4; to: 24; value: page.cfg_progressHeight
+            from: 4; to: 48; value: page.cfg_progressHeight
             textFromValue: function(v) { return v + " px" }
             valueFromText: function(t) { return parseInt(t) || 8 }
             onValueModified: page.cfg_progressHeight = value
@@ -134,6 +133,7 @@ QQC2.ScrollView {
             valueFromText: function(t) { return parseInt(t) || 720 }
             onValueModified: page.cfg_maxHeight = value
         }
+
         QQC2.CheckBox {
             Kirigami.FormData.label: page.tr2("Разделы:", "Volumes:")
             text: page.tr2("Показывать системный раздел /", "Show system volume /")
@@ -175,8 +175,10 @@ QQC2.ScrollView {
             valueFromText: function(t) { return parseInt(t) || 2 }
             onValueModified: page.cfg_activityInterval = value
         }
+
         Kirigami.Separator { Kirigami.FormData.isSection: true }
         Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Оформление", "Appearance") }
+
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Непрозрачность фона:", "Background opacity:")
             from: 0; to: 100; value: page.cfg_backgroundOpacity
@@ -256,8 +258,10 @@ QQC2.ScrollView {
             valueFromText: function(t) { return parseInt(t) || 8 }
             onValueModified: page.cfg_contentPadding = value
         }
+
         Kirigami.Separator { Kirigami.FormData.isSection: true }
         Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Обновление", "Refresh") }
+
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Интервал:", "Interval:")
             from: 15; to: 1800; stepSize: 15; value: page.cfg_updateInterval
