@@ -12,19 +12,17 @@ PlasmoidItem {
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
-    readonly property bool ru:     Plasmoid.configuration.language !== "en"
-    readonly property int  pad:    Plasmoid.configuration.contentPadding
-    readonly property int  sepH:   Plasmoid.configuration.separatorHeight
+    readonly property bool ru:      Plasmoid.configuration.language !== "en"
+    readonly property int  pad:     Plasmoid.configuration.contentPadding
+    readonly property int  sepH:    Plasmoid.configuration.separatorHeight
     readonly property int  rowPadV: Math.max(4, Plasmoid.configuration.rowPaddingV)
-    readonly property int  maxH:   Plasmoid.configuration.maxHeight
+    readonly property int  maxH:    Plasmoid.configuration.maxHeight
 
-    // Желаемая высота виджета — берётся напрямую из implicitHeight view
     property int lastSentHeight: -1
 
     function sendHeight() {
         if (!Plasmoid.configuration.autoFit) return
-        var h = Math.min(view.implicitHeight, maxH)
-        h = Math.max(Kirigami.Units.gridUnit * 9, h)
+        var h = view.implicitHeight
         if (h === lastSentHeight) return
         lastSentHeight = h
         Qt.callLater(function() {
@@ -46,8 +44,8 @@ PlasmoidItem {
     Connections {
         target: root.plasmoid
         ignoreUnknownSignals: true
-        function onDeviceMounted() { root.refresh(0) }
-        function onDeviceRemoved() { root.refresh(0) }
+        function onDeviceMounted()   { root.refresh(0) }
+        function onDeviceRemoved()   { root.refresh(0) }
         function onSuspendedChanged() {
             suspendedOverlay.visible = root.plasmoid.suspended
         }
@@ -225,7 +223,7 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Data source ──────────────────────────────────────────────────────────
+    // ── Data source ───────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -247,7 +245,7 @@ PlasmoidItem {
         }
     }
 
-    // ── Timers ───────────────────────────────────────────────────────────────
+    // ── Timers ────────────────────────────────────────────────────────────
     Timer {
         interval:  Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat:    true
@@ -268,7 +266,7 @@ PlasmoidItem {
         onTriggered: root.refresh(0)
     }
 
-    // ── Config watchers ──────────────────────────────────────────────────────
+    // ── Config watchers ───────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()        { root.refresh(0) }
@@ -282,12 +280,12 @@ PlasmoidItem {
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ──────────────────────────────────────────────────
+    // ── Full representation ───────────────────────────────────────────────
     fullRepresentation: Item {
         id: view
 
-        // Имплицитная высота = паддинг + заголовок + интервал + реальный contentHeight
-        // Ограничена maxH; виджет автоматически растягивается по ней
+        // implicitHeight = паддинг + заголовок + spacing + реальный contentHeight списка,
+        // зажатый между minH и maxH. Plasma читает это значение и меняет размер окна.
         implicitWidth:  Kirigami.Units.gridUnit * 29
         implicitHeight: Math.max(
             Kirigami.Units.gridUnit * 9,
@@ -300,6 +298,7 @@ PlasmoidItem {
             )
         )
 
+        // Сообщаем Plasma новую высоту при каждом изменении
         onImplicitHeightChanged: root.sendHeight()
 
         Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
@@ -320,15 +319,17 @@ PlasmoidItem {
             textBase.r, textBase.g, textBase.b,
             Plasmoid.configuration.textOpacity / 100.0)
 
+        // Фон всегда по реальному view.height (может быть больше implicitHeight,
+        // если пользователь вручную растянул виджет)
         EdgeFadeBackground {
             anchors.fill: parent
-            baseColor:   view.backgroundBase
-            centerAlpha: Plasmoid.configuration.backgroundOpacity / 100.0
-            edgeAlpha:   Plasmoid.configuration.edgeOpacity / 100.0
-            fadeWidth:   Plasmoid.configuration.edgeWidth
-            curve:       Plasmoid.configuration.edgeCurve / 100.0
-            radius:      Plasmoid.configuration.rounded
-                             ? Plasmoid.configuration.cornerRadius : 0
+            baseColor:    view.backgroundBase
+            centerAlpha:  Plasmoid.configuration.backgroundOpacity / 100.0
+            edgeAlpha:    Plasmoid.configuration.edgeOpacity / 100.0
+            fadeWidth:    Plasmoid.configuration.edgeWidth
+            curve:        Plasmoid.configuration.edgeCurve / 100.0
+            radius:       Plasmoid.configuration.rounded
+                              ? Plasmoid.configuration.cornerRadius : 0
         }
 
         Rectangle {
@@ -359,18 +360,17 @@ PlasmoidItem {
             }
         }
 
-        // Колонка занимает весь view, фон рисуется по view.height
+        // ColumnLayout прижат к top/left/right БЕЗ anchors.bottom —
+        // это ключевое: он сжимается до implicitHeight своих детей,
+        // не растягиваясь на весь view при уменьшении списка дисков.
         ColumnLayout {
-            anchors {
-                top:    parent.top
-                left:   parent.left
-                right:  parent.right
-                bottom: parent.bottom
-                margins: root.pad
-            }
+            anchors.top:    parent.top
+            anchors.left:   parent.left
+            anchors.right:  parent.right
+            anchors.margins: root.pad
             spacing: Kirigami.Units.smallSpacing
 
-            // ── Заголовок ────────────────────────────────────────────────
+            // ── Заголовок ────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth:       true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -394,16 +394,16 @@ PlasmoidItem {
                 }
             }
 
-            // ── Список дисков ───────────────────────────────────────────
-            // Layout.fillHeight убран! ListView получает высоту ровно contentHeight.
-            // При превышении maxH виджет обрезается снизу и появляется полоса прокрутки.
+            // ── Список дисков ─────────────────────────────────────────
+            // preferredHeight = contentHeight → список ровно по содержимому.
+            // maximumHeight ограничивает при достижении maxH → появляется скролл.
             ListView {
                 id:            list
                 Layout.fillWidth: true
-                // Высота = реальный contentHeight, урезанный до того, что осталось в ColumnLayout
                 Layout.preferredHeight: contentHeight
                 Layout.maximumHeight:   Math.max(0,
-                    root.maxH - root.pad * 2
+                    root.maxH
+                        - root.pad * 2
                         - Kirigami.Units.gridUnit * 2
                         - Kirigami.Units.smallSpacing)
                 clip:           true
@@ -417,7 +417,7 @@ PlasmoidItem {
                         : QQC2.ScrollBar.AlwaysOff
                 }
 
-                // ── Делегат ────────────────────────────────────────────────
+                // ── Делегат ───────────────────────────────────────────
                 delegate: Item {
                     required property string title
                     required property string target
@@ -465,7 +465,7 @@ PlasmoidItem {
                         width:   parent.width
                         spacing: Kirigami.Units.largeSpacing
 
-                        // ─ Иконка ────────────────────────────────────────
+                        // ─ Иконка ─────────────────────────────────────
                         Item {
                             Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
                             Layout.preferredHeight: Kirigami.Units.iconSizes.medium
@@ -485,7 +485,7 @@ PlasmoidItem {
                             }
                         }
 
-                        // ─ Текст + полоса ────────────────────────────
+                        // ─ Текст + полоса ─────────────────────────────
                         ColumnLayout {
                             Layout.fillWidth:    true
                             Layout.rightMargin:  Kirigami.Units.largeSpacing
@@ -536,6 +536,7 @@ PlasmoidItem {
                                 }
                             }
 
+                            // ── Полоса прогресса ──────────────────────
                             Item {
                                 Layout.fillWidth:       true
                                 Layout.preferredHeight: Math.max(2, Plasmoid.configuration.progressHeight)
@@ -572,7 +573,7 @@ PlasmoidItem {
                             }
                         }
                     }
-                }
+                } // delegate
 
                 PC3.Label {
                     anchors.centerIn: parent
@@ -584,7 +585,7 @@ PlasmoidItem {
                     opacity:        0.75
                     font.pixelSize: root.fontPx(15)
                 }
-            }
-        }
-    }
+            } // ListView
+        } // ColumnLayout
+    } // fullRepresentation
 }
