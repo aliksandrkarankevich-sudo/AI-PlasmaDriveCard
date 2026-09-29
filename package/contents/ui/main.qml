@@ -15,40 +15,53 @@ PlasmoidItem {
     readonly property bool ru:   Plasmoid.configuration.language !== "en"
     readonly property int  pad:  Plasmoid.configuration.contentPadding
     readonly property int  sepH: Plasmoid.configuration.separatorHeight
+    readonly property int  rowPadV: Math.max(4, Plasmoid.configuration.rowPaddingV)
 
-    // Вертикальный отступ внутри строки (сверху и снизу)
-    readonly property int rowPadV: Math.max(4, Plasmoid.configuration.rowPaddingV)
-
-    // Справочное значение для отображения в настройках (не используется для любых вычислений)
+    // Справочная формула — для настроек и стартовой высоты (пока list не отрисован)
     readonly property int effectiveRowH:
         rowPadV * 2
         + fontPx(18) + fontPx(16) + fontPx(13)
         + fontPx(13) + Math.max(2, Plasmoid.configuration.progressHeight)
         + Kirigami.Units.smallSpacing * 4
 
-    // Желаемая высота виджета: берётся из list.contentHeight после реальной отрисовки
-    property int wantedHeight: Kirigami.Units.gridUnit * 9
+    // Желаемая высота: инициализируем из формулы, затем уточняем по contentHeight
+    property int wantedHeight: _calcWanted(effectiveRowH)
     property int lastSentHeight: -1
 
-    function updateWantedHeight() {
-        if (!Plasmoid.configuration.autoFit) return
-        var h = Math.max(
+    function _calcWanted(singleRowH) {
+        return Math.max(
             Kirigami.Units.gridUnit * 9,
             Math.min(
                 Plasmoid.configuration.maxHeight,
                 pad * 2
                     + Kirigami.Units.gridUnit * 2
                     + Kirigami.Units.smallSpacing
-                    + list.contentHeight
+                    + Math.max(1, drives.count) * singleRowH
+                    + Math.max(0, drives.count - 1) * sepH
             )
         )
-        if (h === lastSentHeight) return
-        lastSentHeight = h
-        wantedHeight = h
+    }
+
+    function updateWantedHeight() {
+        if (!Plasmoid.configuration.autoFit) return
+        // Если list уже отрисован — берём реальный contentHeight
+        var realH = list.contentHeight > 0
+            ? Math.max(
+                Kirigami.Units.gridUnit * 9,
+                Math.min(
+                    Plasmoid.configuration.maxHeight,
+                    pad * 2
+                        + Kirigami.Units.gridUnit * 2
+                        + Kirigami.Units.smallSpacing
+                        + list.contentHeight
+                )
+              )
+            : _calcWanted(effectiveRowH)
+        if (realH === lastSentHeight) return
+        lastSentHeight = realH
+        wantedHeight = realH
         Qt.callLater(function() {
-            console.log("[DC] setPreferredSize wanted=", h,
-                        "contentH=", list.contentHeight, "root.h=", root.height)
-            root.plasmoid.setPreferredSize(root.width, h)
+            root.plasmoid.setPreferredSize(root.width, realH)
         })
     }
 
@@ -75,10 +88,13 @@ PlasmoidItem {
 
     Connections {
         target: drives
-        function onCountChanged() { root.lastSentHeight = -1 }
+        function onCountChanged() {
+            root.lastSentHeight = -1
+            Qt.callLater(root.updateWantedHeight)
+        }
     }
 
-    // ── Functions ───────────────────────────────────────────────────────────
+    // ── Functions ──────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) {
         return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
@@ -369,6 +385,7 @@ PlasmoidItem {
             anchors.margins: root.pad
             spacing:         Kirigami.Units.smallSpacing
 
+            // ── Заголовок ────────────────────────────────────────────────
             RowLayout {
                 Layout.fillWidth:       true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
@@ -392,6 +409,7 @@ PlasmoidItem {
                 }
             }
 
+            // ── Список дисков ───────────────────────────────────────────
             ListView {
                 id:             list
                 Layout.fillWidth:  true
@@ -401,7 +419,6 @@ PlasmoidItem {
                 spacing:           root.sepH
                 boundsBehavior:    Flickable.StopAtBounds
 
-                // Авторазмер: как только contentHeight изменился — пересчитываем высоту виджета
                 onContentHeightChanged: Qt.callLater(root.updateWantedHeight)
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
@@ -410,7 +427,9 @@ PlasmoidItem {
                         : QQC2.ScrollBar.AlwaysOff
                 }
 
-                delegate: QQC2.ItemDelegate {
+                // ── Делегат: чистый Item, без QQC2.ItemDelegate ───────────────────
+                // implicitHeight текает наверх через row → col → Item, без посредников
+                delegate: Item {
                     required property string title
                     required property string target
                     required property string source
@@ -424,22 +443,14 @@ PlasmoidItem {
                     required property bool   active
                     required property int    index
 
-                    width:  list.width - (list.contentHeight > list.height
-                                ? Kirigami.Units.smallSpacing * 2 + 2 : 0)
-                    // Высота = implicitHeight внутреннего контента.
-                    // QQC2.ItemDelegate берёт implicitHeight из contentItem автоматически.
-                    // Не задаём height вручную — пусть определяет ColumnLayout.
-                    padding: 0; leftPadding: 0; rightPadding: 0
-                    topPadding: 0; bottomPadding: 0
-                    clip: false
-                    onClicked: root.openTarget(target)
+                    width:          list.width
+                    implicitHeight: row.implicitHeight
+                    height:         implicitHeight
 
-                    QQC2.ToolTip.visible: hovered
-                    QQC2.ToolTip.text:   source + "\n" + target
-                    QQC2.ToolTip.delay:  600
-
-                    background: Rectangle {
-                        color: parent.hovered
+                    // Фон при hover
+                    Rectangle {
+                        anchors.fill: parent
+                        color: hoverArea.containsMouse
                             ? Qt.rgba(
                                 Kirigami.Theme.highlightColor.r,
                                 Kirigami.Theme.highlightColor.g,
@@ -450,11 +461,24 @@ PlasmoidItem {
                         Behavior on color { ColorAnimation { duration: 120 } }
                     }
 
-                    contentItem: RowLayout {
-                        // Без anchors.fill — пусть implicitHeight просчитывается через детей
+                    QQC2.ToolTip.visible: hoverArea.containsMouse
+                    QQC2.ToolTip.text:   source + "\n" + target
+                    QQC2.ToolTip.delay:  600
+
+                    MouseArea {
+                        id: hoverArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: root.openTarget(target)
+                    }
+
+                    RowLayout {
+                        id:    row
+                        // ширина = родитель; anchors не используем — implicitHeight считается свободно
+                        width:   parent.width
                         spacing: Kirigami.Units.largeSpacing
 
-                        // ─ Иконка ───────────────────────────────────────
+                        // ─ Иконка ────────────────────────────────────────
                         Item {
                             Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
                             Layout.preferredHeight: Kirigami.Units.iconSizes.medium
@@ -474,11 +498,10 @@ PlasmoidItem {
                             }
                         }
 
-                        // ─ Текст + полоса ─────────────────────────────
+                        // ─ Текст + полоса ────────────────────────────
                         ColumnLayout {
-                            Layout.fillWidth: true
-                            Layout.rightMargin: Kirigami.Units.largeSpacing
-                            // Отступ сверху/снизу через topPadding/bottomPadding на Column
+                            Layout.fillWidth:    true
+                            Layout.rightMargin:  Kirigami.Units.largeSpacing
                             Layout.topMargin:    root.rowPadV
                             Layout.bottomMargin: root.rowPadV
                             spacing: Kirigami.Units.smallSpacing
