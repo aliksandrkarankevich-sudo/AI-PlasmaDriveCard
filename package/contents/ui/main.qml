@@ -24,20 +24,6 @@ PlasmoidItem {
     property bool pendingRefresh:  false
     property var  previousIo:      ({})
 
-    Binding {
-        target:   root.plasmoid
-        property: "driveCount"
-        value:    drives.count
-    }
-
-    Connections {
-        target: root.plasmoid
-        ignoreUnknownSignals: true
-        function onDeviceMounted()    { root.refresh(0) }
-        function onDeviceRemoved()    { root.refresh(0) }
-        function onSuspendedChanged() { suspendedOverlay.visible = root.plasmoid.suspended }
-    }
-
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) {
         return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
@@ -98,14 +84,13 @@ PlasmoidItem {
     function rebuild(output) {
         var marker      = "__DC_LSBLK__"
         var markerIndex = output.indexOf(marker)
-        if (markerIndex < 0) { root.plasmoid.reportResult(false); return }
+        if (markerIndex < 0) return
         var findmntData, lsblkData
         try {
             findmntData = JSON.parse(output.substring(0, markerIndex).trim())
             lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
         } catch (error) {
             console.warn("DriveCard JSON:", error)
-            root.plasmoid.reportResult(false)
             return
         }
         var map    = ({})
@@ -154,9 +139,9 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
-        console.warn("[DriveCard] rebuild done, drives.count=", drives.count, "→ fitTimer.restart")
-        fitTimer.restart()
-        root.plasmoid.reportResult(true)
+        // FIX: запускаем таймер только если он ещё не идёт —
+        // иначе волна onContentHeightChanged после drives.append его сбросит
+        if (!fitTimer.running) fitTimer.start()
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -192,6 +177,17 @@ PlasmoidItem {
             drives.setProperty(i, "driveIcon", displayIcon(row.target, row.physical))
         }
     }
+    // FIX: единственный API который Desktop containment реально слушает
+    function applyFit() {
+        if (!Plasmoid.configuration.autoFit) return
+        var h = Math.max(
+            minH,
+            Math.min(maxH,
+                pad * 2 + header.implicitHeight + layout.spacing + list.contentHeight
+            )
+        )
+        Plasmoid.setPreferredSize(-1, h)
+    }
 
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript:
@@ -225,8 +221,7 @@ PlasmoidItem {
 
     Timer {
         interval:  Math.max(15, Plasmoid.configuration.updateInterval) * 1000
-        repeat:    true
-        running:   true
+        repeat:    true; running: true
         onTriggered: root.refresh(0)
     }
     Timer {
@@ -236,39 +231,17 @@ PlasmoidItem {
         triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
-    Timer {
-        id: delayedRefresh
-        interval: 1200
-        repeat: false
-        onTriggered: root.refresh(0)
-    }
+    Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
+
+    // Таймер срабатывает ровно один раз после того как list.contentHeight устоялся.
+    // rebuild() запускает его через start() (не restart!), поэтому волна
+    // onContentHeightChanged не может его сбросить — он уже идёт.
+    // Из Connections/onAutoFitChanged используем restart() — там нет «волны».
     Timer {
         id: fitTimer
-        interval: 150
+        interval: 200
         repeat: false
-        onTriggered: {
-            if (!Plasmoid.configuration.autoFit) {
-                console.warn("[DriveCard] fitTimer: autoFit=false, skip")
-                return
-            }
-            var listCH = list.contentHeight
-            var viewCH = view.contentH
-            var rootH  = root.height
-            var rootLH = root.Layout.preferredHeight
-            console.warn("[DriveCard] fitTimer BEFORE:",
-                "drives=",    drives.count,
-                "list.contentH=", listCH,
-                "view.contentH=", viewCH,
-                "root.height=",   rootH,
-                "root.Layout.pH=", rootLH)
-            root.Layout.minimumHeight  = viewCH
-            root.Layout.preferredHeight = viewCH
-            root.Layout.maximumHeight  = viewCH
-            root.height = viewCH
-            console.warn("[DriveCard] fitTimer AFTER:",
-                "root.height=", root.height,
-                "root.Layout.pH=", root.Layout.preferredHeight)
-        }
+        onTriggered: root.applyFit()
     }
 
     Connections {
@@ -295,31 +268,16 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: view
 
-        readonly property int contentH: {
-            var h = Math.max(
-                root.minH,
-                Math.min(
-                    root.maxH,
-                    root.pad * 2
-                        + header.implicitHeight
-                        + layout.spacing
-                        + list.contentHeight
-                )
-            )
-            console.warn("[DriveCard] view.contentH changed:", h,
-                "| list.contentH=", list.contentHeight,
-                "| drives.count=", drives.count)
-            return h
-        }
-
         implicitWidth:  Kirigami.Units.gridUnit * 29
-        implicitHeight: contentH
+        implicitHeight: Math.max(root.minH,
+            Math.min(root.maxH,
+                root.pad * 2 + header.implicitHeight + layout.spacing + list.contentHeight))
 
         Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
         Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
         Layout.minimumHeight:   root.minH
-        Layout.preferredHeight: contentH
-        Layout.maximumHeight:   Plasmoid.configuration.autoFit ? contentH : 16777215
+        Layout.preferredHeight: implicitHeight
+        Layout.maximumHeight:   Plasmoid.configuration.autoFit ? implicitHeight : 16777215
 
         readonly property color backgroundBase:
             Plasmoid.configuration.backgroundColorMode === "custom"
@@ -342,34 +300,6 @@ PlasmoidItem {
             curve:        Plasmoid.configuration.edgeCurve / 100.0
             radius:       Plasmoid.configuration.rounded
                               ? Plasmoid.configuration.cornerRadius : 0
-        }
-
-        Rectangle {
-            id: suspendedOverlay
-            anchors.fill: parent
-            visible: false
-            color:   Qt.rgba(0, 0, 0, 0.55)
-            radius:  Plasmoid.configuration.rounded
-                         ? Plasmoid.configuration.cornerRadius : 0
-            z: 99
-            Column {
-                anchors.centerIn: parent
-                spacing: Kirigami.Units.smallSpacing
-                Kirigami.Icon {
-                    source: "dialog-warning"
-                    width:  Kirigami.Units.iconSizes.large
-                    height: Kirigami.Units.iconSizes.large
-                    anchors.horizontalCenter: parent.horizontalCenter
-                }
-                PC3.Label {
-                    text: root.tr2(
-                        "Виджет приостановлен\nПовтор через 30 с",
-                        "Widget suspended\nRetrying in 30 s")
-                    color: "white"
-                    horizontalAlignment: Text.AlignHCenter
-                    font.pixelSize: root.fontPx(14)
-                }
-            }
         }
 
         ColumnLayout {
@@ -414,10 +344,9 @@ PlasmoidItem {
                 model: drives
                 spacing: root.sepH
                 boundsBehavior: Flickable.StopAtBounds
-                onContentHeightChanged: {
-                    console.warn("[DriveCard] list.contentHeight changed:", contentHeight, "drives.count=", drives.count)
-                    fitTimer.restart()
-                }
+                // FIX: НЕ делаем restart — только start если таймер уже не идёт.
+                // Это предотвращает сброс таймера волной contentHeight после rebuild.
+                onContentHeightChanged: { if (!fitTimer.running) fitTimer.start() }
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height
