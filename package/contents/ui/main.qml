@@ -38,7 +38,6 @@ PlasmoidItem {
         function onSuspendedChanged() { suspendedOverlay.visible = root.plasmoid.suspended }
     }
 
-    // ── Functions ──────────────────────────────────────────────────────────
     function tr2(r, e) { return ru ? r : e }
     function fontPx(base) {
         return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
@@ -155,6 +154,7 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
+        fitTimer.restart()
         root.plasmoid.reportResult(true)
     }
     function refresh(delay) {
@@ -192,7 +192,6 @@ PlasmoidItem {
         }
     }
 
-    // ── Commands ────────────────────────────────────────────────────────────
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
     readonly property string scanScript:
         "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
@@ -202,7 +201,6 @@ PlasmoidItem {
 
     ListModel { id: drives }
 
-    // ── Data source ───────────────────────────────────────────────────────
     Plasma5Support.DataSource {
         id: executable
         engine: "executable"
@@ -224,7 +222,6 @@ PlasmoidItem {
         }
     }
 
-    // ── Timers ────────────────────────────────────────────────────────────
     Timer {
         interval:  Math.max(15, Plasmoid.configuration.updateInterval) * 1000
         repeat:    true
@@ -239,36 +236,57 @@ PlasmoidItem {
         onTriggered: root.refreshActivity()
     }
     Timer {
-        id:       delayedRefresh
+        id: delayedRefresh
         interval: 1200
-        repeat:   false
+        repeat: false
         onTriggered: root.refresh(0)
     }
+    Timer {
+        id: fitTimer
+        interval: 150
+        repeat: false
+        onTriggered: {
+            if (!Plasmoid.configuration.autoFit)
+                return
+            var h = view.contentH
+            root.Layout.minimumHeight = h
+            root.Layout.preferredHeight = h
+            root.Layout.maximumHeight = h
+            root.height = h
+        }
+    }
 
-    // ── Config watchers ───────────────────────────────────────────────────
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()        { root.refresh(0) }
         function onShowBootChanged()        { root.refresh(0) }
         function onIconStyleChanged()       { root.refreshIcons() }
+        function onTextScaleChanged()       { fitTimer.restart() }
+        function onRowPaddingVChanged()     { fitTimer.restart() }
+        function onSeparatorHeightChanged() { fitTimer.restart() }
+        function onProgressHeightChanged()  { fitTimer.restart() }
+        function onMaxHeightChanged()       { fitTimer.restart() }
+        function onAutoFitChanged()         { fitTimer.restart() }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
 
-    // ── Full representation ───────────────────────────────────────────────
+    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
+    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
+    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? minH : minH
+    Layout.preferredHeight: Plasmoid.configuration.autoFit ? minH : minH
+    Layout.maximumHeight:   Plasmoid.configuration.autoFit ? minH : 16777215
+
     fullRepresentation: Item {
         id: view
 
-        // Вся магия высоты в одном месте: implicitHeight.
-        // Plasma 6 читает Layout.preferredHeight и Layout.maximumHeight с этого объекта
-        // и реально меняет размер виджета на рабочем столе без setPreferredSize.
         readonly property int contentH: Math.max(
             root.minH,
             Math.min(
                 root.maxH,
                 root.pad * 2
-                    + Kirigami.Units.gridUnit * 2
-                    + Kirigami.Units.smallSpacing
+                    + header.implicitHeight
+                    + layout.spacing
                     + list.contentHeight
             )
         )
@@ -280,7 +298,6 @@ PlasmoidItem {
         Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
         Layout.minimumHeight:   root.minH
         Layout.preferredHeight: contentH
-        // maximumHeight = preferredHeight — это заставляет Plasma сжимать виджет вниз
         Layout.maximumHeight:   Plasmoid.configuration.autoFit ? contentH : 16777215
 
         readonly property color backgroundBase:
@@ -334,18 +351,16 @@ PlasmoidItem {
             }
         }
 
-        // ColumnLayout: top+left+right, БЕЗ bottom.
-        // Сжимается до своего implicitHeight,
-        // что даёт list.contentHeight протечь в view.contentH.
         ColumnLayout {
+            id: layout
             anchors.top:     parent.top
             anchors.left:    parent.left
             anchors.right:   parent.right
             anchors.margins: root.pad
             spacing:         Kirigami.Units.smallSpacing
 
-            // ── Заголовок ───────────────────────────────────────────
             RowLayout {
+                id: header
                 Layout.fillWidth:       true
                 Layout.preferredHeight: Kirigami.Units.gridUnit * 2
                 Kirigami.Icon {
@@ -368,22 +383,17 @@ PlasmoidItem {
                 }
             }
 
-            // ── Список дисков ───────────────────────────────────────
-            // preferredHeight равен contentHeight — список ровно по содержимому.
-            // maximumHeight ограничивает при maxH — появляется полоса прокрутки.
             ListView {
-                id:                   list
-                Layout.fillWidth:     true
+                id: list
+                Layout.fillWidth: true
                 Layout.preferredHeight: contentHeight
                 Layout.maximumHeight: Math.max(0,
-                    root.maxH
-                        - root.pad * 2
-                        - Kirigami.Units.gridUnit * 2
-                        - Kirigami.Units.smallSpacing)
-                clip:           true
-                model:          drives
-                spacing:        root.sepH
+                    root.maxH - root.pad * 2 - header.implicitHeight - layout.spacing)
+                clip: true
+                model: drives
+                spacing: root.sepH
                 boundsBehavior: Flickable.StopAtBounds
+                onContentHeightChanged: fitTimer.restart()
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height
@@ -434,24 +444,24 @@ PlasmoidItem {
                     }
 
                     RowLayout {
-                        id:      row
-                        width:   parent.width
+                        id: row
+                        width: parent.width
                         spacing: Kirigami.Units.largeSpacing
 
                         Item {
                             Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
                             Layout.preferredHeight: Kirigami.Units.iconSizes.medium
-                            Layout.alignment:       Qt.AlignVCenter
-                            Layout.leftMargin:      Kirigami.Units.smallSpacing
+                            Layout.alignment: Qt.AlignVCenter
+                            Layout.leftMargin: Kirigami.Units.smallSpacing
                             Kirigami.Icon { anchors.fill: parent; source: driveIcon }
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
                                 width:   Kirigami.Units.smallSpacing * 2
                                 height:  Kirigami.Units.smallSpacing * 2
                                 radius:  Kirigami.Units.smallSpacing
-                                anchors.right:  parent.right
+                                anchors.right: parent.right
                                 anchors.bottom: parent.bottom
-                                color:        Kirigami.Theme.positiveTextColor
+                                color: Kirigami.Theme.positiveTextColor
                                 border.width: Math.max(1, Kirigami.Units.smallSpacing / 2)
                                 border.color: Kirigami.Theme.backgroundColor
                             }
@@ -543,19 +553,19 @@ PlasmoidItem {
                             }
                         }
                     }
-                } // delegate
+                }
 
                 PC3.Label {
                     anchors.centerIn: parent
-                    visible:          drives.count === 0
+                    visible: drives.count === 0
                     text: root.scanRunning
-                        ? root.tr2("Обновление...",             "Refreshing...")
+                        ? root.tr2("Обновление...", "Refreshing...")
                         : root.tr2("Доступные диски не найдены", "No accessible drives found")
-                    color:          view.labelColor
-                    opacity:        0.75
+                    color: view.labelColor
+                    opacity: 0.75
                     font.pixelSize: root.fontPx(15)
                 }
-            } // ListView
-        } // ColumnLayout
-    } // fullRepresentation
+            }
+        }
+    }
 }
