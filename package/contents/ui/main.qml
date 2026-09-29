@@ -154,6 +154,7 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
+        console.warn("[DriveCard] rebuild done, drives.count=", drives.count, "→ fitTimer.restart")
         fitTimer.restart()
         root.plasmoid.reportResult(true)
     }
@@ -246,13 +247,27 @@ PlasmoidItem {
         interval: 150
         repeat: false
         onTriggered: {
-            if (!Plasmoid.configuration.autoFit)
+            if (!Plasmoid.configuration.autoFit) {
+                console.warn("[DriveCard] fitTimer: autoFit=false, skip")
                 return
-            var h = view.contentH
-            root.Layout.minimumHeight = h
-            root.Layout.preferredHeight = h
-            root.Layout.maximumHeight = h
-            root.height = h
+            }
+            var listCH = list.contentHeight
+            var viewCH = view.contentH
+            var rootH  = root.height
+            var rootLH = root.Layout.preferredHeight
+            console.warn("[DriveCard] fitTimer BEFORE:",
+                "drives=",    drives.count,
+                "list.contentH=", listCH,
+                "view.contentH=", viewCH,
+                "root.height=",   rootH,
+                "root.Layout.pH=", rootLH)
+            root.Layout.minimumHeight  = viewCH
+            root.Layout.preferredHeight = viewCH
+            root.Layout.maximumHeight  = viewCH
+            root.height = viewCH
+            console.warn("[DriveCard] fitTimer AFTER:",
+                "root.height=", root.height,
+                "root.Layout.pH=", root.Layout.preferredHeight)
         }
     }
 
@@ -273,23 +288,29 @@ PlasmoidItem {
 
     Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
     Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
-    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? minH : minH
-    Layout.preferredHeight: Plasmoid.configuration.autoFit ? minH : minH
+    Layout.minimumHeight:   minH
+    Layout.preferredHeight: minH
     Layout.maximumHeight:   Plasmoid.configuration.autoFit ? minH : 16777215
 
     fullRepresentation: Item {
         id: view
 
-        readonly property int contentH: Math.max(
-            root.minH,
-            Math.min(
-                root.maxH,
-                root.pad * 2
-                    + header.implicitHeight
-                    + layout.spacing
-                    + list.contentHeight
+        readonly property int contentH: {
+            var h = Math.max(
+                root.minH,
+                Math.min(
+                    root.maxH,
+                    root.pad * 2
+                        + header.implicitHeight
+                        + layout.spacing
+                        + list.contentHeight
+                )
             )
-        )
+            console.warn("[DriveCard] view.contentH changed:", h,
+                "| list.contentH=", list.contentHeight,
+                "| drives.count=", drives.count)
+            return h
+        }
 
         implicitWidth:  Kirigami.Units.gridUnit * 29
         implicitHeight: contentH
@@ -393,7 +414,10 @@ PlasmoidItem {
                 model: drives
                 spacing: root.sepH
                 boundsBehavior: Flickable.StopAtBounds
-                onContentHeightChanged: fitTimer.restart()
+                onContentHeightChanged: {
+                    console.warn("[DriveCard] list.contentHeight changed:", contentHeight, "drives.count=", drives.count)
+                    fitTimer.restart()
+                }
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height
