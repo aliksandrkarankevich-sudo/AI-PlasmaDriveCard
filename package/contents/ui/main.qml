@@ -12,56 +12,23 @@ PlasmoidItem {
 
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
-    readonly property bool ru:   Plasmoid.configuration.language !== "en"
-    readonly property int  pad:  Plasmoid.configuration.contentPadding
-    readonly property int  sepH: Plasmoid.configuration.separatorHeight
+    readonly property bool ru:     Plasmoid.configuration.language !== "en"
+    readonly property int  pad:    Plasmoid.configuration.contentPadding
+    readonly property int  sepH:   Plasmoid.configuration.separatorHeight
     readonly property int  rowPadV: Math.max(4, Plasmoid.configuration.rowPaddingV)
+    readonly property int  maxH:   Plasmoid.configuration.maxHeight
 
-    // Справочная формула — для настроек и стартовой высоты (пока list не отрисован)
-    readonly property int effectiveRowH:
-        rowPadV * 2
-        + fontPx(18) + fontPx(16) + fontPx(13)
-        + fontPx(13) + Math.max(2, Plasmoid.configuration.progressHeight)
-        + Kirigami.Units.smallSpacing * 4
-
-    // Желаемая высота: инициализируем из формулы, затем уточняем по contentHeight
-    property int wantedHeight: _calcWanted(effectiveRowH)
+    // Желаемая высота виджета — берётся напрямую из implicitHeight view
     property int lastSentHeight: -1
 
-    function _calcWanted(singleRowH) {
-        return Math.max(
-            Kirigami.Units.gridUnit * 9,
-            Math.min(
-                Plasmoid.configuration.maxHeight,
-                pad * 2
-                    + Kirigami.Units.gridUnit * 2
-                    + Kirigami.Units.smallSpacing
-                    + Math.max(1, drives.count) * singleRowH
-                    + Math.max(0, drives.count - 1) * sepH
-            )
-        )
-    }
-
-    function updateWantedHeight() {
+    function sendHeight() {
         if (!Plasmoid.configuration.autoFit) return
-        // Если list уже отрисован — берём реальный contentHeight
-        var realH = list.contentHeight > 0
-            ? Math.max(
-                Kirigami.Units.gridUnit * 9,
-                Math.min(
-                    Plasmoid.configuration.maxHeight,
-                    pad * 2
-                        + Kirigami.Units.gridUnit * 2
-                        + Kirigami.Units.smallSpacing
-                        + list.contentHeight
-                )
-              )
-            : _calcWanted(effectiveRowH)
-        if (realH === lastSentHeight) return
-        lastSentHeight = realH
-        wantedHeight = realH
+        var h = Math.min(view.implicitHeight, maxH)
+        h = Math.max(Kirigami.Units.gridUnit * 9, h)
+        if (h === lastSentHeight) return
+        lastSentHeight = h
         Qt.callLater(function() {
-            root.plasmoid.setPreferredSize(root.width, realH)
+            root.plasmoid.setPreferredSize(root.width, h)
         })
     }
 
@@ -90,7 +57,7 @@ PlasmoidItem {
         target: drives
         function onCountChanged() {
             root.lastSentHeight = -1
-            Qt.callLater(root.updateWantedHeight)
+            Qt.callLater(root.sendHeight)
         }
     }
 
@@ -307,10 +274,10 @@ PlasmoidItem {
         function onShowRootChanged()        { root.refresh(0) }
         function onShowBootChanged()        { root.refresh(0) }
         function onIconStyleChanged()       { root.refreshIcons() }
-        function onTextScaleChanged()       { root.lastSentHeight = -1; Qt.callLater(root.updateWantedHeight) }
-        function onRowPaddingVChanged()     { root.lastSentHeight = -1; Qt.callLater(root.updateWantedHeight) }
-        function onSeparatorHeightChanged() { root.lastSentHeight = -1; Qt.callLater(root.updateWantedHeight) }
-        function onProgressHeightChanged()  { root.lastSentHeight = -1; Qt.callLater(root.updateWantedHeight) }
+        function onTextScaleChanged()       { root.lastSentHeight = -1 }
+        function onRowPaddingVChanged()     { root.lastSentHeight = -1 }
+        function onSeparatorHeightChanged() { root.lastSentHeight = -1 }
+        function onProgressHeightChanged()  { root.lastSentHeight = -1 }
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
@@ -319,15 +286,27 @@ PlasmoidItem {
     fullRepresentation: Item {
         id: view
 
+        // Имплицитная высота = паддинг + заголовок + интервал + реальный contentHeight
+        // Ограничена maxH; виджет автоматически растягивается по ней
         implicitWidth:  Kirigami.Units.gridUnit * 29
-        implicitHeight: root.wantedHeight
+        implicitHeight: Math.max(
+            Kirigami.Units.gridUnit * 9,
+            Math.min(
+                root.maxH,
+                root.pad * 2
+                    + Kirigami.Units.gridUnit * 2
+                    + Kirigami.Units.smallSpacing
+                    + list.contentHeight
+            )
+        )
+
+        onImplicitHeightChanged: root.sendHeight()
 
         Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
         Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
         Layout.minimumHeight:   Kirigami.Units.gridUnit * 9
-        Layout.preferredHeight: root.wantedHeight
-        Layout.maximumHeight:   Plasmoid.configuration.autoFit
-                                    ? root.wantedHeight : 16777215
+        Layout.preferredHeight: implicitHeight
+        Layout.maximumHeight:   Plasmoid.configuration.autoFit ? implicitHeight : 16777215
 
         readonly property color backgroundBase:
             Plasmoid.configuration.backgroundColorMode === "custom"
@@ -380,10 +359,16 @@ PlasmoidItem {
             }
         }
 
+        // Колонка занимает весь view, фон рисуется по view.height
         ColumnLayout {
-            anchors.fill:    parent
-            anchors.margins: root.pad
-            spacing:         Kirigami.Units.smallSpacing
+            anchors {
+                top:    parent.top
+                left:   parent.left
+                right:  parent.right
+                bottom: parent.bottom
+                margins: root.pad
+            }
+            spacing: Kirigami.Units.smallSpacing
 
             // ── Заголовок ────────────────────────────────────────────────
             RowLayout {
@@ -395,10 +380,10 @@ PlasmoidItem {
                     Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
                 }
                 PC3.Label {
-                    text:            root.tr2("Диски", "Drives")
-                    color:           view.labelColor
-                    font.bold:       true
-                    font.pixelSize:  root.fontPx(20)
+                    text:             root.tr2("Диски", "Drives")
+                    color:            view.labelColor
+                    font.bold:        true
+                    font.pixelSize:   root.fontPx(20)
                     Layout.fillWidth: true
                 }
                 PC3.Label {
@@ -410,16 +395,21 @@ PlasmoidItem {
             }
 
             // ── Список дисков ───────────────────────────────────────────
+            // Layout.fillHeight убран! ListView получает высоту ровно contentHeight.
+            // При превышении maxH виджет обрезается снизу и появляется полоса прокрутки.
             ListView {
-                id:             list
-                Layout.fillWidth:  true
-                Layout.fillHeight: true
-                clip:              true
-                model:             drives
-                spacing:           root.sepH
-                boundsBehavior:    Flickable.StopAtBounds
-
-                onContentHeightChanged: Qt.callLater(root.updateWantedHeight)
+                id:            list
+                Layout.fillWidth: true
+                // Высота = реальный contentHeight, урезанный до того, что осталось в ColumnLayout
+                Layout.preferredHeight: contentHeight
+                Layout.maximumHeight:   Math.max(0,
+                    root.maxH - root.pad * 2
+                        - Kirigami.Units.gridUnit * 2
+                        - Kirigami.Units.smallSpacing)
+                clip:           true
+                model:          drives
+                spacing:        root.sepH
+                boundsBehavior: Flickable.StopAtBounds
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height
@@ -427,8 +417,7 @@ PlasmoidItem {
                         : QQC2.ScrollBar.AlwaysOff
                 }
 
-                // ── Делегат: чистый Item, без QQC2.ItemDelegate ───────────────────
-                // implicitHeight текает наверх через row → col → Item, без посредников
+                // ── Делегат ────────────────────────────────────────────────
                 delegate: Item {
                     required property string title
                     required property string target
@@ -447,7 +436,6 @@ PlasmoidItem {
                     implicitHeight: row.implicitHeight
                     height:         implicitHeight
 
-                    // Фон при hover
                     Rectangle {
                         anchors.fill: parent
                         color: hoverArea.containsMouse
@@ -473,8 +461,7 @@ PlasmoidItem {
                     }
 
                     RowLayout {
-                        id:    row
-                        // ширина = родитель; anchors не используем — implicitHeight считается свободно
+                        id:      row
                         width:   parent.width
                         spacing: Kirigami.Units.largeSpacing
 
@@ -507,20 +494,20 @@ PlasmoidItem {
                             spacing: Kirigami.Units.smallSpacing
 
                             PC3.Label {
-                                text:           title
-                                color:          view.labelColor
-                                font.bold:      true
-                                font.pixelSize: root.fontPx(18)
-                                elide:          Text.ElideRight
+                                text:             title
+                                color:            view.labelColor
+                                font.bold:        true
+                                font.pixelSize:   root.fontPx(18)
+                                elide:            Text.ElideRight
                                 Layout.fillWidth: true
                             }
                             PC3.Label {
                                 text: root.formatBytes(available) + " "
                                     + root.tr2("свободно из", "free of") + " "
                                     + root.formatBytes(total)
-                                color:          view.labelColor
-                                font.pixelSize: root.fontPx(16)
-                                elide:          Text.ElideRight
+                                color:            view.labelColor
+                                font.pixelSize:   root.fontPx(16)
+                                elide:            Text.ElideRight
                                 Layout.fillWidth: true
                             }
                             PC3.Label {
@@ -531,10 +518,10 @@ PlasmoidItem {
                                     var b = Plasmoid.configuration.showPhysical ? physical : ""
                                     return (a && b) ? (a + "  •  " + b) : (a + b)
                                 }
-                                color:          view.labelColor
-                                opacity:        0.72
-                                font.pixelSize: root.fontPx(13)
-                                elide:          Text.ElideRight
+                                color:            view.labelColor
+                                opacity:          0.72
+                                font.pixelSize:   root.fontPx(13)
+                                elide:            Text.ElideRight
                                 Layout.fillWidth: true
                             }
 
@@ -549,12 +536,11 @@ PlasmoidItem {
                                 }
                             }
 
-                            // ── Полоса прогресса ──
                             Item {
                                 Layout.fillWidth:       true
                                 Layout.preferredHeight: Math.max(2, Plasmoid.configuration.progressHeight)
 
-                                readonly property int   ph: Math.max(2, Plasmoid.configuration.progressHeight)
+                                readonly property int   ph:    Math.max(2, Plasmoid.configuration.progressHeight)
                                 readonly property real  fillW: width * Math.max(0, Math.min(100, used)) / 100.0
                                 readonly property color fillColor:
                                     used >= Plasmoid.configuration.criticalPercent
@@ -590,7 +576,7 @@ PlasmoidItem {
 
                 PC3.Label {
                     anchors.centerIn: parent
-                    visible:        drives.count === 0
+                    visible:          drives.count === 0
                     text: root.scanRunning
                         ? root.tr2("Обновление...",             "Refreshing...")
                         : root.tr2("Доступные диски не найдены", "No accessible drives found")
