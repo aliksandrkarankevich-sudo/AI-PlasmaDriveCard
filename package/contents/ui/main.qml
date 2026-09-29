@@ -6,6 +6,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PC3
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
+import org.kde.solid 1.0 as Solid
 
 PlasmoidItem {
     id: root
@@ -18,6 +19,19 @@ PlasmoidItem {
     readonly property int  rowPadV: Math.max(4, Plasmoid.configuration.rowPaddingV)
     readonly property int  maxH:    Plasmoid.configuration.maxHeight
     readonly property int  minH:    Kirigami.Units.gridUnit * 9
+    readonly property int  headerH: Kirigami.Units.gridUnit * 2
+    readonly property int  rowGapV: Kirigami.Units.smallSpacing
+    readonly property int  progressH: Math.max(2, Plasmoid.configuration.progressHeight)
+    readonly property int  effectiveRowH:
+        rowPadV * 2
+        + fontPx(18) + fontPx(16) + fontPx(13)
+        + fontPx(13) + progressH
+        + rowGapV * 4
+    readonly property int wantedHeight: Math.max(minH,
+        Math.min(maxH,
+            pad * 2 + headerH + layout.spacing
+            + Math.max(1, drives.count) * effectiveRowH
+            + Math.max(0, drives.count - 1) * sepH))
 
     property bool scanRunning:     false
     property bool activityRunning: false
@@ -139,9 +153,6 @@ PlasmoidItem {
         drives.clear()
         previousIo = ({})
         for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
-        // FIX: запускаем таймер только если он ещё не идёт —
-        // иначе волна onContentHeightChanged после drives.append его сбросит
-        if (!fitTimer.running) fitTimer.start()
     }
     function refresh(delay) {
         if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -177,16 +188,8 @@ PlasmoidItem {
             drives.setProperty(i, "driveIcon", displayIcon(row.target, row.physical))
         }
     }
-    // FIX: единственный API который Desktop containment реально слушает
-    function applyFit() {
-        if (!Plasmoid.configuration.autoFit) return
-        var h = Math.max(
-            minH,
-            Math.min(maxH,
-                pad * 2 + header.implicitHeight + layout.spacing + list.contentHeight
-            )
-        )
-        Plasmoid.setPreferredSize(-1, h)
+    function scheduleStorageRefresh() {
+        refresh(400)
     }
 
     readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
@@ -195,6 +198,12 @@ PlasmoidItem {
         + "printf '\\n__DC_LSBLK__\\n'; "
         + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
     readonly property string activityCommand: "/bin/cat /proc/diskstats"
+
+    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
+    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
+    Layout.minimumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : minH
+    Layout.preferredHeight: Plasmoid.configuration.autoFit ? wantedHeight : minH
+    Layout.maximumHeight:   Plasmoid.configuration.autoFit ? wantedHeight : 16777215
 
     ListModel { id: drives }
 
@@ -220,8 +229,15 @@ PlasmoidItem {
     }
 
     Timer {
+        id: delayedRefresh
+        interval: 400
+        repeat: false
+        onTriggered: root.refresh(0)
+    }
+    Timer {
         interval:  Math.max(15, Plasmoid.configuration.updateInterval) * 1000
-        repeat:    true; running: true
+        repeat:    true
+        running:   true
         onTriggered: root.refresh(0)
     }
     Timer {
@@ -231,53 +247,39 @@ PlasmoidItem {
         triggeredOnStart: true
         onTriggered: root.refreshActivity()
     }
-    Timer { id: delayedRefresh; interval: 1200; repeat: false; onTriggered: root.refresh(0) }
-
-    // Таймер срабатывает ровно один раз после того как list.contentHeight устоялся.
-    // rebuild() запускает его через start() (не restart!), поэтому волна
-    // onContentHeightChanged не может его сбросить — он уже идёт.
-    // Из Connections/onAutoFitChanged используем restart() — там нет «волны».
-    Timer {
-        id: fitTimer
-        interval: 200
-        repeat: false
-        onTriggered: root.applyFit()
-    }
 
     Connections {
         target: Plasmoid.configuration
         function onShowRootChanged()        { root.refresh(0) }
         function onShowBootChanged()        { root.refresh(0) }
         function onIconStyleChanged()       { root.refreshIcons() }
-        function onTextScaleChanged()       { fitTimer.restart() }
-        function onRowPaddingVChanged()     { fitTimer.restart() }
-        function onSeparatorHeightChanged() { fitTimer.restart() }
-        function onProgressHeightChanged()  { fitTimer.restart() }
-        function onMaxHeightChanged()       { fitTimer.restart() }
-        function onAutoFitChanged()         { fitTimer.restart() }
+        function onTextScaleChanged()       { root.scheduleStorageRefresh() }
+        function onRowPaddingVChanged()     { root.scheduleStorageRefresh() }
+        function onSeparatorHeightChanged() { root.scheduleStorageRefresh() }
+        function onProgressHeightChanged()  { root.scheduleStorageRefresh() }
+        function onMaxHeightChanged()       { root.scheduleStorageRefresh() }
+        function onAutoFitChanged()         { root.scheduleStorageRefresh() }
+    }
+
+    Solid.DeviceNotifier {
+        id: deviceNotifier
+        onDeviceAdded:    root.scheduleStorageRefresh()
+        onDeviceRemoved:  root.scheduleStorageRefresh()
     }
 
     Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
-
-    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
-    Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
-    Layout.minimumHeight:   minH
-    Layout.preferredHeight: minH
-    Layout.maximumHeight:   Plasmoid.configuration.autoFit ? minH : 16777215
 
     fullRepresentation: Item {
         id: view
 
         implicitWidth:  Kirigami.Units.gridUnit * 29
-        implicitHeight: Math.max(root.minH,
-            Math.min(root.maxH,
-                root.pad * 2 + header.implicitHeight + layout.spacing + list.contentHeight))
+        implicitHeight: root.wantedHeight
 
         Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
         Layout.preferredWidth:  Kirigami.Units.gridUnit * 29
-        Layout.minimumHeight:   root.minH
-        Layout.preferredHeight: implicitHeight
-        Layout.maximumHeight:   Plasmoid.configuration.autoFit ? implicitHeight : 16777215
+        Layout.minimumHeight:   Plasmoid.configuration.autoFit ? root.wantedHeight : root.minH
+        Layout.preferredHeight: Plasmoid.configuration.autoFit ? root.wantedHeight : root.minH
+        Layout.maximumHeight:   Plasmoid.configuration.autoFit ? root.wantedHeight : 16777215
 
         readonly property color backgroundBase:
             Plasmoid.configuration.backgroundColorMode === "custom"
@@ -302,18 +304,44 @@ PlasmoidItem {
                               ? Plasmoid.configuration.cornerRadius : 0
         }
 
+        Rectangle {
+            id: suspendedOverlay
+            anchors.fill: parent
+            visible: false
+            color:   Qt.rgba(0, 0, 0, 0.55)
+            radius:  Plasmoid.configuration.rounded
+                         ? Plasmoid.configuration.cornerRadius : 0
+            z: 99
+            Column {
+                anchors.centerIn: parent
+                spacing: Kirigami.Units.smallSpacing
+                Kirigami.Icon {
+                    source: "dialog-warning"
+                    width:  Kirigami.Units.iconSizes.large
+                    height: Kirigami.Units.iconSizes.large
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
+                PC3.Label {
+                    text: root.tr2(
+                        "Виджет приостановлен\nПовтор через 30 с",
+                        "Widget suspended\nRetrying in 30 s")
+                    color: "white"
+                    horizontalAlignment: Text.AlignHCenter
+                    font.pixelSize: root.fontPx(14)
+                }
+            }
+        }
+
         ColumnLayout {
             id: layout
-            anchors.top:     parent.top
-            anchors.left:    parent.left
-            anchors.right:   parent.right
+            anchors.fill: parent
             anchors.margins: root.pad
-            spacing:         Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.smallSpacing
 
             RowLayout {
                 id: header
                 Layout.fillWidth:       true
-                Layout.preferredHeight: Kirigami.Units.gridUnit * 2
+                Layout.preferredHeight: root.headerH
                 Kirigami.Icon {
                     source: "drive-harddisk"
                     Layout.preferredWidth:  Kirigami.Units.iconSizes.smallMedium
@@ -337,16 +365,11 @@ PlasmoidItem {
             ListView {
                 id: list
                 Layout.fillWidth: true
-                Layout.preferredHeight: contentHeight
-                Layout.maximumHeight: Math.max(0,
-                    root.maxH - root.pad * 2 - header.implicitHeight - layout.spacing)
+                Layout.fillHeight: true
                 clip: true
                 model: drives
                 spacing: root.sepH
                 boundsBehavior: Flickable.StopAtBounds
-                // FIX: НЕ делаем restart — только start если таймер уже не идёт.
-                // Это предотвращает сброс таймера волной contentHeight после rebuild.
-                onContentHeightChanged: { if (!fitTimer.running) fitTimer.start() }
 
                 QQC2.ScrollBar.vertical: QQC2.ScrollBar {
                     policy: list.contentHeight > list.height
@@ -369,7 +392,7 @@ PlasmoidItem {
                     required property int    index
 
                     width:          list.width
-                    implicitHeight: row.implicitHeight
+                    implicitHeight: root.effectiveRowH
                     height:         implicitHeight
 
                     Rectangle {
@@ -398,14 +421,15 @@ PlasmoidItem {
 
                     RowLayout {
                         id: row
-                        width: parent.width
+                        anchors.fill: parent
+                        anchors.leftMargin: Kirigami.Units.smallSpacing
+                        anchors.rightMargin: Kirigami.Units.largeSpacing
                         spacing: Kirigami.Units.largeSpacing
 
                         Item {
                             Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
                             Layout.preferredHeight: Kirigami.Units.iconSizes.medium
                             Layout.alignment: Qt.AlignVCenter
-                            Layout.leftMargin: Kirigami.Units.smallSpacing
                             Kirigami.Icon { anchors.fill: parent; source: driveIcon }
                             Rectangle {
                                 visible: Plasmoid.configuration.showActivity && active
@@ -422,10 +446,10 @@ PlasmoidItem {
 
                         ColumnLayout {
                             Layout.fillWidth:    true
-                            Layout.rightMargin:  Kirigami.Units.largeSpacing
+                            Layout.alignment:    Qt.AlignVCenter
                             Layout.topMargin:    root.rowPadV
                             Layout.bottomMargin: root.rowPadV
-                            spacing: Kirigami.Units.smallSpacing
+                            spacing: root.rowGapV
 
                             PC3.Label {
                                 text:             title
@@ -472,9 +496,9 @@ PlasmoidItem {
 
                             Item {
                                 Layout.fillWidth:       true
-                                Layout.preferredHeight: Math.max(2, Plasmoid.configuration.progressHeight)
+                                Layout.preferredHeight: root.progressH
 
-                                readonly property int   ph:    Math.max(2, Plasmoid.configuration.progressHeight)
+                                readonly property int   ph:    root.progressH
                                 readonly property real  fillW: width * Math.max(0, Math.min(100, used)) / 100.0
                                 readonly property color fillColor:
                                     used >= Plasmoid.configuration.criticalPercent
