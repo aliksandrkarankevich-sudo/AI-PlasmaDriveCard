@@ -6,7 +6,6 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PC3
 import org.kde.plasma.plasma5support as Plasma5Support
 import org.kde.kirigami as Kirigami
-import org.kde.solid 1.0 as Solid
 
 PlasmoidItem {
    id: root
@@ -67,6 +66,8 @@ PlasmoidItem {
    property bool activityRunning: false
    property bool pendingRefresh:  false
    property var  previousIo:      ({})
+   // последний момент сканирования — для fallback-детектора устройств
+   property real _lastScanMs:     0
 
    function tr2(r, e) { return ru ? r : e }
    function fontPx(base) {
@@ -183,6 +184,7 @@ PlasmoidItem {
        drives.clear()
        previousIo = ({})
        for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
+       _lastScanMs = Date.now()
    }
    function refresh(delay) {
        if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -277,6 +279,30 @@ PlasmoidItem {
        triggeredOnStart: true
        onTriggered: root.refreshActivity()
    }
+   // Fallback-детектор устройств: опрашивает /proc/partitions каждые 5 с,
+   // при изменении числа строк инициирует пересканирование дисков.
+   // Заменяет Solid.DeviceNotifier без зависимости от org.kde.solid.
+   Timer {
+       id: hotplugPoller
+       interval: 5000
+       repeat:   true
+       running:  true
+       property int _lastCount: -1
+       onTriggered: hotplugExec.connectSource("cat /proc/partitions")
+   }
+   Plasma5Support.DataSource {
+       id: hotplugExec
+       engine: "executable"
+       onNewData: function(sourceName, data) {
+           disconnectSource(sourceName)
+           var lines = (data["stdout"] || "").split("\n").filter(function(l) {
+               return l.trim().length > 0
+           }).length
+           if (hotplugPoller._lastCount >= 0 && lines !== hotplugPoller._lastCount)
+               root.scheduleStorageRefresh()
+           hotplugPoller._lastCount = lines
+       }
+   }
 
    Connections {
        target: Plasmoid.configuration
@@ -289,12 +315,6 @@ PlasmoidItem {
        function onProgressHeightChanged()  { root.scheduleStorageRefresh() }
        function onMaxHeightChanged()       { root.scheduleStorageRefresh() }
        function onAutoFitChanged()         { root.scheduleStorageRefresh() }
-   }
-
-   Solid.DeviceNotifier {
-       id: deviceNotifier
-       onDeviceAdded:   root.scheduleStorageRefresh()
-       onDeviceRemoved: root.scheduleStorageRefresh()
    }
 
    Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
