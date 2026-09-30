@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 
@@ -7,7 +8,7 @@ QQC2.ScrollView {
     clip: true
     contentWidth: availableWidth
     QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
-    QQC2.ScrollBar.vertical.policy: QQC2.ScrollBar.AsNeeded
+    QQC2.ScrollBar.vertical.policy:   QQC2.ScrollBar.AsNeeded
 
     property string title
 
@@ -40,6 +41,8 @@ QQC2.ScrollView {
     property int    cfg_updateInterval
     property int    cfg_warningPercent
     property int    cfg_criticalPercent
+    property string cfg_profiles
+    property string cfg_activeProfile
 
     property string cfg_languageDefault:            "ru"
     property bool   cfg_autoFitDefault:             true
@@ -70,15 +73,14 @@ QQC2.ScrollView {
     property int    cfg_updateIntervalDefault:      60
     property int    cfg_warningPercentDefault:      80
     property int    cfg_criticalPercentDefault:     90
+    property string cfg_profilesDefault:            ""
+    property string cfg_activeProfileDefault:       ""
 
     readonly property bool ru: cfg_language !== "en"
-    function tr2(ruText, enText) { return ru ? ruText : enText }
+    function tr2(r, e) { return ru ? r : e }
 
-    // Вычисление реальной высоты строки (повторяет формулу из main.qml)
-    readonly property int _smallSp: 4   // приближение Kirigami.Units.smallSpacing
-    function _fontPx(base) {
-        return Math.max(8, Math.round(base * cfg_textScale / 100.0))
-    }
+    readonly property int _smallSp: 4
+    function _fontPx(base) { return Math.max(8, Math.round(base * cfg_textScale / 100.0)) }
     readonly property int _rowPadV: Math.max(4, cfg_rowPaddingV)
     readonly property int _rowGapV: _smallSp
     readonly property int _effectiveRowH:
@@ -87,6 +89,116 @@ QQC2.ScrollView {
         + _fontPx(13) + Math.max(2, cfg_progressHeight)
         + _rowGapV * 4
 
+    // ── профили ─────────────────────────────────────────────────────────
+    // Профили хранятся как JSON-массив объектов: [{name, ...все cfg_*}]
+    function _loadProfiles() {
+        if (!cfg_profiles || cfg_profiles.trim() === "") return []
+        try { return JSON.parse(cfg_profiles) } catch(e) { return [] }
+    }
+    function _saveProfiles(arr) {
+        cfg_profiles = JSON.stringify(arr)
+    }
+    function _profileNames() {
+        return _loadProfiles().map(function(p) { return p.name })
+    }
+    function _currentSnapshot(name) {
+        return {
+            name:                name,
+            language:            cfg_language,
+            autoFit:             cfg_autoFit,
+            rowPaddingV:         cfg_rowPaddingV,
+            separatorHeight:     cfg_separatorHeight,
+            textScale:           cfg_textScale,
+            progressHeight:      cfg_progressHeight,
+            maxHeight:           cfg_maxHeight,
+            showRoot:            cfg_showRoot,
+            showBoot:            cfg_showBoot,
+            showFs:              cfg_showFs,
+            showPhysical:        cfg_showPhysical,
+            iconStyle:           cfg_iconStyle,
+            showActivity:        cfg_showActivity,
+            activityInterval:    cfg_activityInterval,
+            backgroundOpacity:   cfg_backgroundOpacity,
+            backgroundColorMode: cfg_backgroundColorMode,
+            backgroundColor:     cfg_backgroundColor,
+            textOpacity:         cfg_textOpacity,
+            textColorMode:       cfg_textColorMode,
+            textColor:           cfg_textColor,
+            rounded:             cfg_rounded,
+            cornerRadius:        cfg_cornerRadius,
+            edgeOpacity:         cfg_edgeOpacity,
+            edgeWidth:           cfg_edgeWidth,
+            edgeCurve:           cfg_edgeCurve,
+            contentPadding:      cfg_contentPadding,
+            updateInterval:      cfg_updateInterval,
+            warningPercent:      cfg_warningPercent,
+            criticalPercent:     cfg_criticalPercent
+        }
+    }
+    function saveProfile(name) {
+        if (!name || name.trim() === "") return
+        var arr = _loadProfiles()
+        var idx = arr.findIndex(function(p) { return p.name === name })
+        var snap = _currentSnapshot(name)
+        if (idx >= 0) arr[idx] = snap
+        else arr.push(snap)
+        _saveProfiles(arr)
+        cfg_activeProfile = name
+        profileModel.reload()
+    }
+    function loadProfile(name) {
+        var arr = _loadProfiles()
+        var p = arr.find(function(x) { return x.name === name })
+        if (!p) return
+        cfg_language            = p.language            !== undefined ? p.language            : cfg_languageDefault
+        cfg_autoFit             = p.autoFit             !== undefined ? p.autoFit             : cfg_autoFitDefault
+        cfg_rowPaddingV         = p.rowPaddingV         !== undefined ? p.rowPaddingV         : cfg_rowPaddingVDefault
+        cfg_separatorHeight     = p.separatorHeight     !== undefined ? p.separatorHeight     : cfg_separatorHeightDefault
+        cfg_textScale           = p.textScale           !== undefined ? p.textScale           : cfg_textScaleDefault
+        cfg_progressHeight      = p.progressHeight      !== undefined ? p.progressHeight      : cfg_progressHeightDefault
+        cfg_maxHeight           = p.maxHeight           !== undefined ? p.maxHeight           : cfg_maxHeightDefault
+        cfg_showRoot            = p.showRoot            !== undefined ? p.showRoot            : cfg_showRootDefault
+        cfg_showBoot            = p.showBoot            !== undefined ? p.showBoot            : cfg_showBootDefault
+        cfg_showFs              = p.showFs              !== undefined ? p.showFs              : cfg_showFsDefault
+        cfg_showPhysical        = p.showPhysical        !== undefined ? p.showPhysical        : cfg_showPhysicalDefault
+        cfg_iconStyle           = p.iconStyle           !== undefined ? p.iconStyle           : cfg_iconStyleDefault
+        cfg_showActivity        = p.showActivity        !== undefined ? p.showActivity        : cfg_showActivityDefault
+        cfg_activityInterval    = p.activityInterval    !== undefined ? p.activityInterval    : cfg_activityIntervalDefault
+        cfg_backgroundOpacity   = p.backgroundOpacity   !== undefined ? p.backgroundOpacity   : cfg_backgroundOpacityDefault
+        cfg_backgroundColorMode = p.backgroundColorMode !== undefined ? p.backgroundColorMode : cfg_backgroundColorModeDefault
+        cfg_backgroundColor     = p.backgroundColor     !== undefined ? p.backgroundColor     : cfg_backgroundColorDefault
+        cfg_textOpacity         = p.textOpacity         !== undefined ? p.textOpacity         : cfg_textOpacityDefault
+        cfg_textColorMode       = p.textColorMode       !== undefined ? p.textColorMode       : cfg_textColorModeDefault
+        cfg_textColor           = p.textColor           !== undefined ? p.textColor           : cfg_textColorDefault
+        cfg_rounded             = p.rounded             !== undefined ? p.rounded             : cfg_roundedDefault
+        cfg_cornerRadius        = p.cornerRadius        !== undefined ? p.cornerRadius        : cfg_cornerRadiusDefault
+        cfg_edgeOpacity         = p.edgeOpacity         !== undefined ? p.edgeOpacity         : cfg_edgeOpacityDefault
+        cfg_edgeWidth           = p.edgeWidth           !== undefined ? p.edgeWidth           : cfg_edgeWidthDefault
+        cfg_edgeCurve           = p.edgeCurve           !== undefined ? p.edgeCurve           : cfg_edgeCurveDefault
+        cfg_contentPadding      = p.contentPadding      !== undefined ? p.contentPadding      : cfg_contentPaddingDefault
+        cfg_updateInterval      = p.updateInterval      !== undefined ? p.updateInterval      : cfg_updateIntervalDefault
+        cfg_warningPercent      = p.warningPercent      !== undefined ? p.warningPercent      : cfg_warningPercentDefault
+        cfg_criticalPercent     = p.criticalPercent     !== undefined ? p.criticalPercent     : cfg_criticalPercentDefault
+        cfg_activeProfile = name
+    }
+    function deleteProfile(name) {
+        var arr = _loadProfiles().filter(function(p) { return p.name !== name })
+        _saveProfiles(arr)
+        if (cfg_activeProfile === name) cfg_activeProfile = ""
+        profileModel.reload()
+    }
+
+    ListModel {
+        id: profileModel
+        function reload() {
+            clear()
+            var names = page._profileNames()
+            for (var i = 0; i < names.length; ++i) append({ pname: names[i] })
+        }
+        Component.onCompleted: reload()
+    }
+
+    // ── UI ──────────────────────────────────────────────────────────────
     Kirigami.FormLayout {
         width: page.availableWidth
         implicitHeight: childrenRect.height + 48
@@ -95,6 +207,64 @@ QQC2.ScrollView {
         anchors.right: parent.right
         anchors.margins: Kirigami.Units.largeSpacing
 
+        // ── Профили ─────────────────────────────────────────────────────
+        Kirigami.Separator { Kirigami.FormData.isSection: true }
+        Kirigami.Heading {
+            Kirigami.FormData.isSection: true; level: 3
+            text: page.tr2("Профили настроек", "Settings Profiles")
+                + (page.cfg_activeProfile ? "  —  " + page.cfg_activeProfile : "")
+        }
+
+        // Список профилей
+        ListView {
+            Kirigami.FormData.label: page.tr2("Сохранённые:", "Saved:")
+            Layout.fillWidth: true
+            implicitHeight: Math.min(profileModel.count * 40, 160)
+            visible: profileModel.count > 0
+            model: profileModel
+            clip: true
+            delegate: RowLayout {
+                width: parent ? parent.width : 0
+                height: 38
+                spacing: Kirigami.Units.smallSpacing
+                QQC2.Label {
+                    text: model.pname
+                    Layout.fillWidth: true
+                    color: model.pname === page.cfg_activeProfile
+                        ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                    font.bold: model.pname === page.cfg_activeProfile
+                }
+                QQC2.Button {
+                    text: page.tr2("Загрузить", "Load")
+                    onClicked: page.loadProfile(model.pname)
+                }
+                QQC2.Button {
+                    text: page.tr2("Удалить", "Delete")
+                    onClicked: page.deleteProfile(model.pname)
+                }
+            }
+        }
+
+        // Сохранить / создать профиль
+        RowLayout {
+            Kirigami.FormData.label: page.tr2("Новый профиль:", "New profile:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.TextField {
+                id: profileNameField
+                Layout.fillWidth: true
+                placeholderText: page.tr2("Название...", "Name...")
+                text: page.cfg_activeProfile
+            }
+            QQC2.Button {
+                text: page.tr2("Сохранить", "Save")
+                enabled: profileNameField.text.trim().length > 0
+                onClicked: page.saveProfile(profileNameField.text.trim())
+            }
+        }
+
+        // ── Язык ────────────────────────────────────────────────────────
+        Kirigami.Separator { Kirigami.FormData.isSection: true }
         QQC2.ComboBox {
             Kirigami.FormData.label: page.tr2("Язык:", "Language:")
             model: ["Русский", "English"]
@@ -102,6 +272,7 @@ QQC2.ScrollView {
             onActivated: page.cfg_language = currentIndex === 1 ? "en" : "ru"
         }
 
+        // ── Размер ──────────────────────────────────────────────────────
         Kirigami.Separator { Kirigami.FormData.isSection: true }
         Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Размер", "Size") }
 
@@ -111,14 +282,11 @@ QQC2.ScrollView {
             checked: page.cfg_autoFit
             onToggled: page.cfg_autoFit = checked
         }
-
-        // Высота строки — только для чтения, показывает реальное значение
         QQC2.Label {
             Kirigami.FormData.label: page.tr2("Высота строки:", "Row height:")
             text: page._effectiveRowH + " px  " + page.tr2("(авто)", "(auto)")
             opacity: 0.65
         }
-
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Отступ строки:", "Row padding:")
             from: 4; to: 40; stepSize: 2; value: page.cfg_rowPaddingV
@@ -154,6 +322,10 @@ QQC2.ScrollView {
             valueFromText: function(t) { return parseInt(t) || 720 }
             onValueModified: page.cfg_maxHeight = value
         }
+
+        // ── Разделы / значки ─────────────────────────────────────────────
+        Kirigami.Separator { Kirigami.FormData.isSection: true }
+        Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Содержимое", "Content") }
 
         QQC2.CheckBox {
             Kirigami.FormData.label: page.tr2("Разделы:", "Volumes:")
@@ -197,6 +369,7 @@ QQC2.ScrollView {
             onValueModified: page.cfg_activityInterval = value
         }
 
+        // ── Оформление ──────────────────────────────────────────────────
         Kirigami.Separator { Kirigami.FormData.isSection: true }
         Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Оформление", "Appearance") }
 
@@ -207,18 +380,20 @@ QQC2.ScrollView {
             valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
             onValueModified: page.cfg_backgroundOpacity = value
         }
-        QQC2.ComboBox {
+
+        // Цвет фона — RGB-пикер
+        ColorPicker {
             Kirigami.FormData.label: page.tr2("Цвет фона:", "Background color:")
-            model: [page.tr2("Из темы", "From theme"), page.tr2("Свой", "Custom")]
-            currentIndex: page.cfg_backgroundColorMode === "custom" ? 1 : 0
-            onActivated: page.cfg_backgroundColorMode = currentIndex === 1 ? "custom" : "theme"
+            Layout.fillWidth: true
+            label: ""
+            labelTheme:  page.tr2("Из темы", "From theme")
+            labelCustom: page.tr2("Свой",    "Custom")
+            mode:     page.cfg_backgroundColorMode
+            hexColor: page.cfg_backgroundColor
+            onModeChanged:  function(m) { page.cfg_backgroundColorMode = m }
+            onColorChanged: function(h) { page.cfg_backgroundColor = h }
         }
-        QQC2.TextField {
-            Kirigami.FormData.label: page.tr2("Свой фон:", "Custom background:")
-            text: page.cfg_backgroundColor; enabled: page.cfg_backgroundColorMode === "custom"
-            placeholderText: "#20242b"
-            onEditingFinished: if (/^#[0-9a-fA-F]{6}$/.test(text)) page.cfg_backgroundColor = text
-        }
+
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Непрозрачность текста:", "Text opacity:")
             from: 10; to: 100; value: page.cfg_textOpacity
@@ -226,18 +401,20 @@ QQC2.ScrollView {
             valueFromText: function(t) { return parseInt(t) || 10 }
             onValueModified: page.cfg_textOpacity = value
         }
-        QQC2.ComboBox {
+
+        // Цвет текста — RGB-пикер
+        ColorPicker {
             Kirigami.FormData.label: page.tr2("Цвет текста:", "Text color:")
-            model: [page.tr2("Из темы", "From theme"), page.tr2("Свой", "Custom")]
-            currentIndex: page.cfg_textColorMode === "custom" ? 1 : 0
-            onActivated: page.cfg_textColorMode = currentIndex === 1 ? "custom" : "theme"
+            Layout.fillWidth: true
+            label: ""
+            labelTheme:  page.tr2("Из темы", "From theme")
+            labelCustom: page.tr2("Свой",    "Custom")
+            mode:     page.cfg_textColorMode
+            hexColor: page.cfg_textColor
+            onModeChanged:  function(m) { page.cfg_textColorMode = m }
+            onColorChanged: function(h) { page.cfg_textColor = h }
         }
-        QQC2.TextField {
-            Kirigami.FormData.label: page.tr2("Свой текст:", "Custom text:")
-            text: page.cfg_textColor; enabled: page.cfg_textColorMode === "custom"
-            placeholderText: "#eff0f1"
-            onEditingFinished: if (/^#[0-9a-fA-F]{6}$/.test(text)) page.cfg_textColor = text
-        }
+
         QQC2.CheckBox {
             Kirigami.FormData.label: page.tr2("Углы:", "Corners:")
             text: page.tr2("Включить скругление", "Enable rounding")
@@ -280,6 +457,7 @@ QQC2.ScrollView {
             onValueModified: page.cfg_contentPadding = value
         }
 
+        // ── Обновление ──────────────────────────────────────────────────
         Kirigami.Separator { Kirigami.FormData.isSection: true }
         Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Обновление", "Refresh") }
 

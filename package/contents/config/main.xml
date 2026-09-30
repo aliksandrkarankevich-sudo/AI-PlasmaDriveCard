@@ -34,5 +34,7 @@
     <entry name="updateInterval"     type="Int">   <default>60</default></entry>
     <entry name="warningPercent"     type="Int">   <default>80</default></entry>
     <entry name="criticalPercent"    type="Int">   <default>90</default></entry>
+    <entry name="profiles"           type="String"><default></default></entry>
+    <entry name="activeProfile"      type="String"><default></default></entry>
   </group>
 </kcfg>
