@@ -2,15 +2,10 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
+import org.kde.kcmutils as KCM
 
-QQC2.ScrollView {
+KCM.SimpleKCM {
     id: page
-    clip: true
-    contentWidth: availableWidth
-    QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
-    QQC2.ScrollBar.vertical.policy:   QQC2.ScrollBar.AsNeeded
-
-    property string title
 
     property string cfg_language
     property bool   cfg_autoFit
@@ -177,290 +172,273 @@ QQC2.ScrollView {
         Component.onCompleted: reload()
     }
 
-    Item {
-        implicitWidth:  page.availableWidth
-        implicitHeight: formLayout.implicitHeight + 48
+    Kirigami.FormLayout {
+        // ---- Profiles ----
+        Kirigami.Heading {
+            Kirigami.FormData.isSection: true; level: 3
+            text: page.tr2("Профили настроек", "Settings Profiles")
+                + (page.cfg_activeProfile ? "  —  " + page.cfg_activeProfile : "")
+        }
 
-        Kirigami.FormLayout {
-            id: formLayout
-            width: page.availableWidth
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.margins: Kirigami.Units.largeSpacing
-
-            // ---- Profiles ----
-            Kirigami.Separator { Kirigami.FormData.isSection: true }
-            Kirigami.Heading {
-                Kirigami.FormData.isSection: true; level: 3
-                text: page.tr2("Профили настроек", "Settings Profiles")
-                    + (page.cfg_activeProfile ? "  —  " + page.cfg_activeProfile : "")
-            }
-
-            ListView {
-                Kirigami.FormData.label: page.tr2("Сохранённые:", "Saved:")
-                implicitWidth: page.availableWidth - Kirigami.Units.largeSpacing * 4
-                implicitHeight: Math.min(profileModel.count * 40, 160)
-                visible: profileModel.count > 0
-                model: profileModel
-                clip: true
-                delegate: RowLayout {
-                    width: parent ? parent.width : 0
-                    height: 38
-                    spacing: Kirigami.Units.smallSpacing
-                    QQC2.Label {
-                        text: model.pname
-                        Layout.fillWidth: true
-                        color: model.pname === page.cfg_activeProfile
-                            ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
-                        font.bold: model.pname === page.cfg_activeProfile
-                    }
-                    QQC2.Button {
-                        text: page.tr2("Загрузить", "Load")
-                        onClicked: page.loadProfile(model.pname)
-                    }
-                    QQC2.Button {
-                        text: page.tr2("Удалить", "Delete")
-                        onClicked: page.deleteProfile(model.pname)
-                    }
-                }
-            }
-
-            RowLayout {
-                Kirigami.FormData.label: page.tr2("Новый профиль:", "New profile:")
-                implicitWidth: page.availableWidth - Kirigami.Units.largeSpacing * 4
+        ListView {
+            Kirigami.FormData.label: page.tr2("Сохранённые:", "Saved:")
+            Layout.fillWidth: true
+            implicitHeight: Math.min(profileModel.count * 40, 160)
+            visible: profileModel.count > 0
+            model: profileModel
+            clip: true
+            delegate: RowLayout {
+                width: ListView.view ? ListView.view.width : 0
+                height: 38
                 spacing: Kirigami.Units.smallSpacing
-                QQC2.TextField {
-                    id: profileNameField
+                QQC2.Label {
+                    text: model.pname
                     Layout.fillWidth: true
-                    placeholderText: page.tr2("Название...", "Name...")
-                    text: page.cfg_activeProfile
+                    elide: Text.ElideRight
+                    color: model.pname === page.cfg_activeProfile
+                        ? Kirigami.Theme.highlightColor : Kirigami.Theme.textColor
+                    font.bold: model.pname === page.cfg_activeProfile
                 }
                 QQC2.Button {
-                    text: page.tr2("Сохранить", "Save")
-                    enabled: profileNameField.text.trim().length > 0
-                    onClicked: page.saveProfile(profileNameField.text.trim())
+                    text: page.tr2("Загрузить", "Load")
+                    onClicked: page.loadProfile(model.pname)
+                }
+                QQC2.Button {
+                    text: page.tr2("Удалить", "Delete")
+                    onClicked: page.deleteProfile(model.pname)
                 }
             }
+        }
 
-            // ---- Language ----
-            Kirigami.Separator { Kirigami.FormData.isSection: true }
-            QQC2.ComboBox {
-                Kirigami.FormData.label: page.tr2("Язык:", "Language:")
-                model: ["Русский", "English"]
-                currentIndex: page.cfg_language === "en" ? 1 : 0
-                onActivated: page.cfg_language = currentIndex === 1 ? "en" : "ru"
+        RowLayout {
+            Kirigami.FormData.label: page.tr2("Новый профиль:", "New profile:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.TextField {
+                id: profileNameField
+                Layout.fillWidth: true
+                placeholderText: page.tr2("Название...", "Name...")
+                text: page.cfg_activeProfile
             }
+            QQC2.Button {
+                text: page.tr2("Сохранить", "Save")
+                enabled: profileNameField.text.trim().length > 0
+                onClicked: page.saveProfile(profileNameField.text.trim())
+            }
+        }
 
-            // ---- Size ----
-            Kirigami.Separator { Kirigami.FormData.isSection: true }
-            Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Размер", "Size") }
+        // ---- Language ----
+        Kirigami.Separator { Kirigami.FormData.isSection: true }
+        QQC2.ComboBox {
+            Kirigami.FormData.label: page.tr2("Язык:", "Language:")
+            model: ["Русский", "English"]
+            currentIndex: page.cfg_language === "en" ? 1 : 0
+            onActivated: page.cfg_language = currentIndex === 1 ? "en" : "ru"
+        }
 
-            QQC2.CheckBox {
-                Kirigami.FormData.label: page.tr2("Высота:", "Height:")
-                text: page.tr2("Подбирать автоматически", "Fit automatically")
-                checked: page.cfg_autoFit
-                onToggled: page.cfg_autoFit = checked
-            }
-            QQC2.Label {
-                Kirigami.FormData.label: page.tr2("Высота строки:", "Row height:")
-                text: page._effectiveRowH + " px  " + page.tr2("(авто)", "(auto)")
-                opacity: 0.65
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Отступ строки:", "Row padding:")
-                from: 4; to: 40; stepSize: 2; value: page.cfg_rowPaddingV
-                textFromValue: function(v) { return v + " px" }
-                valueFromText: function(t) { return parseInt(t) || 10 }
-                onValueModified: page.cfg_rowPaddingV = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Отступ между дисками:", "Gap between drives:")
-                from: 0; to: 32; stepSize: 1; value: page.cfg_separatorHeight
-                textFromValue: function(v) { return v === 0 ? page.tr2("выключен", "off") : v + " px" }
-                valueFromText: function(t) { return parseInt(t) || 0 }
-                onValueModified: page.cfg_separatorHeight = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Масштаб текста:", "Text scale:")
-                from: 70; to: 160; stepSize: 5; value: page.cfg_textScale
-                textFromValue: function(v) { return v + "%" }
-                valueFromText: function(t) { return parseInt(t) || 100 }
-                onValueModified: page.cfg_textScale = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Толщина полосы:", "Bar thickness:")
-                from: 4; to: 48; value: page.cfg_progressHeight
-                textFromValue: function(v) { return v + " px" }
-                valueFromText: function(t) { return parseInt(t) || 8 }
-                onValueModified: page.cfg_progressHeight = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Максимальная высота:", "Maximum height:")
-                from: 240; to: 1600; stepSize: 20; value: page.cfg_maxHeight
-                textFromValue: function(v) { return v + " px" }
-                valueFromText: function(t) { return parseInt(t) || 720 }
-                onValueModified: page.cfg_maxHeight = value
-            }
+        // ---- Size ----
+        Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Размер", "Size") }
 
-            // ---- Content ----
-            Kirigami.Separator { Kirigami.FormData.isSection: true }
-            Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Содержимое", "Content") }
+        QQC2.CheckBox {
+            Kirigami.FormData.label: page.tr2("Высота:", "Height:")
+            text: page.tr2("Подбирать автоматически", "Fit automatically")
+            checked: page.cfg_autoFit
+            onToggled: page.cfg_autoFit = checked
+        }
+        QQC2.Label {
+            Kirigami.FormData.label: page.tr2("Высота строки:", "Row height:")
+            text: page._effectiveRowH + " px  " + page.tr2("(авто)", "(auto)")
+            opacity: 0.65
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Отступ строки:", "Row padding:")
+            from: 4; to: 40; stepSize: 2; value: page.cfg_rowPaddingV
+            textFromValue: function(v) { return v + " px" }
+            valueFromText: function(t) { return parseInt(t) || 10 }
+            onValueModified: page.cfg_rowPaddingV = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Отступ между дисками:", "Gap between drives:")
+            from: 0; to: 32; stepSize: 1; value: page.cfg_separatorHeight
+            textFromValue: function(v) { return v === 0 ? page.tr2("выключен", "off") : v + " px" }
+            valueFromText: function(t) { return parseInt(t) || 0 }
+            onValueModified: page.cfg_separatorHeight = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Масштаб текста:", "Text scale:")
+            from: 70; to: 160; stepSize: 5; value: page.cfg_textScale
+            textFromValue: function(v) { return v + "%" }
+            valueFromText: function(t) { return parseInt(t) || 100 }
+            onValueModified: page.cfg_textScale = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Толщина полосы:", "Bar thickness:")
+            from: 4; to: 48; value: page.cfg_progressHeight
+            textFromValue: function(v) { return v + " px" }
+            valueFromText: function(t) { return parseInt(t) || 8 }
+            onValueModified: page.cfg_progressHeight = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Максимальная высота:", "Maximum height:")
+            from: 240; to: 1600; stepSize: 20; value: page.cfg_maxHeight
+            textFromValue: function(v) { return v + " px" }
+            valueFromText: function(t) { return parseInt(t) || 720 }
+            onValueModified: page.cfg_maxHeight = value
+        }
 
-            QQC2.CheckBox {
-                Kirigami.FormData.label: page.tr2("Разделы:", "Volumes:")
-                text: page.tr2("Показывать системный раздел /", "Show system volume /")
-                checked: page.cfg_showRoot
-                onToggled: page.cfg_showRoot = checked
-            }
-            QQC2.CheckBox {
-                text: page.tr2("Показывать /boot и /boot/efi", "Show /boot and /boot/efi")
-                checked: page.cfg_showBoot
-                onToggled: page.cfg_showBoot = checked
-            }
-            QQC2.CheckBox {
-                Kirigami.FormData.label: page.tr2("Сведения:", "Details:")
-                text: page.tr2("Показывать файловую систему", "Show filesystem")
-                checked: page.cfg_showFs
-                onToggled: page.cfg_showFs = checked
-            }
-            QQC2.CheckBox {
-                text: page.tr2("Показывать физический диск кратко", "Show short physical drive")
-                checked: page.cfg_showPhysical
-                onToggled: page.cfg_showPhysical = checked
-            }
-            QQC2.ComboBox {
-                Kirigami.FormData.label: page.tr2("Значок:", "Icon:")
-                model: [page.tr2("Диск", "Drive"), page.tr2("Папка", "Folder"), page.tr2("Открытая папка", "Open folder")]
-                currentIndex: page.cfg_iconStyle === "folder" ? 1 : (page.cfg_iconStyle === "folder-open" ? 2 : 0)
-                onActivated: page.cfg_iconStyle = currentIndex === 1 ? "folder" : (currentIndex === 2 ? "folder-open" : "drive")
-            }
-            QQC2.CheckBox {
-                Kirigami.FormData.label: page.tr2("Активность:", "Activity:")
-                text: page.tr2("Показывать чтение/запись", "Show read/write activity")
-                checked: page.cfg_showActivity
-                onToggled: page.cfg_showActivity = checked
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Проверять каждые:", "Check every:")
-                from: 1; to: 10; value: page.cfg_activityInterval; enabled: page.cfg_showActivity
-                textFromValue: function(v) { return v + " " + page.tr2("с", "s") }
-                valueFromText: function(t) { return parseInt(t) || 2 }
-                onValueModified: page.cfg_activityInterval = value
-            }
+        // ---- Content ----
+        Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Содержимое", "Content") }
 
-            // ---- Appearance ----
-            Kirigami.Separator { Kirigami.FormData.isSection: true }
-            Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Оформление", "Appearance") }
+        QQC2.CheckBox {
+            Kirigami.FormData.label: page.tr2("Разделы:", "Volumes:")
+            text: page.tr2("Показывать системный раздел /", "Show system volume /")
+            checked: page.cfg_showRoot
+            onToggled: page.cfg_showRoot = checked
+        }
+        QQC2.CheckBox {
+            text: page.tr2("Показывать /boot и /boot/efi", "Show /boot and /boot/efi")
+            checked: page.cfg_showBoot
+            onToggled: page.cfg_showBoot = checked
+        }
+        QQC2.CheckBox {
+            Kirigami.FormData.label: page.tr2("Сведения:", "Details:")
+            text: page.tr2("Показывать файловую систему", "Show filesystem")
+            checked: page.cfg_showFs
+            onToggled: page.cfg_showFs = checked
+        }
+        QQC2.CheckBox {
+            text: page.tr2("Показывать физический диск кратко", "Show short physical drive")
+            checked: page.cfg_showPhysical
+            onToggled: page.cfg_showPhysical = checked
+        }
+        QQC2.ComboBox {
+            Kirigami.FormData.label: page.tr2("Значок:", "Icon:")
+            model: [page.tr2("Диск", "Drive"), page.tr2("Папка", "Folder"), page.tr2("Открытая папка", "Open folder")]
+            currentIndex: page.cfg_iconStyle === "folder" ? 1 : (page.cfg_iconStyle === "folder-open" ? 2 : 0)
+            onActivated: page.cfg_iconStyle = currentIndex === 1 ? "folder" : (currentIndex === 2 ? "folder-open" : "drive")
+        }
+        QQC2.CheckBox {
+            Kirigami.FormData.label: page.tr2("Активность:", "Activity:")
+            text: page.tr2("Показывать чтение/запись", "Show read/write activity")
+            checked: page.cfg_showActivity
+            onToggled: page.cfg_showActivity = checked
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Проверять каждые:", "Check every:")
+            from: 1; to: 10; value: page.cfg_activityInterval; enabled: page.cfg_showActivity
+            textFromValue: function(v) { return v + " " + page.tr2("с", "s") }
+            valueFromText: function(t) { return parseInt(t) || 2 }
+            onValueModified: page.cfg_activityInterval = value
+        }
 
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Непрозрачность фона:", "Background opacity:")
-                from: 0; to: 100; value: page.cfg_backgroundOpacity
-                textFromValue: function(v) { return v + "%" }
-                valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
-                onValueModified: page.cfg_backgroundOpacity = value
-            }
+        // ---- Appearance ----
+        Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Оформление", "Appearance") }
 
-            ColorPicker {
-                Kirigami.FormData.label: page.tr2("Цвет фона:", "Background color:")
-                implicitWidth: page.availableWidth - Kirigami.Units.largeSpacing * 4
-                label: ""
-                labelTheme:  page.tr2("Из темы", "From theme")
-                labelCustom: page.tr2("Свой",    "Custom")
-                mode:     page.cfg_backgroundColorMode
-                hexColor: page.cfg_backgroundColor
-                onModeSelected: function(m) { page.cfg_backgroundColorMode = m }
-                onColorPicked:  function(h) { page.cfg_backgroundColor = h }
-            }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Непрозрачность фона:", "Background opacity:")
+            from: 0; to: 100; value: page.cfg_backgroundOpacity
+            textFromValue: function(v) { return v + "%" }
+            valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
+            onValueModified: page.cfg_backgroundOpacity = value
+        }
 
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Непрозрачность текста:", "Text opacity:")
-                from: 10; to: 100; value: page.cfg_textOpacity
-                textFromValue: function(v) { return v + "%" }
-                valueFromText: function(t) { return parseInt(t) || 10 }
-                onValueModified: page.cfg_textOpacity = value
-            }
+        ColorPicker {
+            Kirigami.FormData.label: page.tr2("Цвет фона:", "Background color:")
+            Layout.fillWidth: true
+            label: ""
+            labelTheme:  page.tr2("Из темы", "From theme")
+            labelCustom: page.tr2("Свой",    "Custom")
+            mode:     page.cfg_backgroundColorMode
+            hexColor: page.cfg_backgroundColor
+            onModeSelected: function(m) { page.cfg_backgroundColorMode = m }
+            onColorPicked:  function(h) { page.cfg_backgroundColor = h }
+        }
 
-            ColorPicker {
-                Kirigami.FormData.label: page.tr2("Цвет текста:", "Text color:")
-                implicitWidth: page.availableWidth - Kirigami.Units.largeSpacing * 4
-                label: ""
-                labelTheme:  page.tr2("Из темы", "From theme")
-                labelCustom: page.tr2("Свой",    "Custom")
-                mode:     page.cfg_textColorMode
-                hexColor: page.cfg_textColor
-                onModeSelected: function(m) { page.cfg_textColorMode = m }
-                onColorPicked:  function(h) { page.cfg_textColor = h }
-            }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Непрозрачность текста:", "Text opacity:")
+            from: 10; to: 100; value: page.cfg_textOpacity
+            textFromValue: function(v) { return v + "%" }
+            valueFromText: function(t) { return parseInt(t) || 10 }
+            onValueModified: page.cfg_textOpacity = value
+        }
 
-            QQC2.CheckBox {
-                Kirigami.FormData.label: page.tr2("Углы:", "Corners:")
-                text: page.tr2("Включить скругление", "Enable rounding")
-                checked: page.cfg_rounded
-                onToggled: page.cfg_rounded = checked
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Радиус:", "Radius:")
-                from: 0; to: 80; value: page.cfg_cornerRadius; enabled: page.cfg_rounded
-                textFromValue: function(v) { return v + " px" }
-                valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
-                onValueModified: page.cfg_cornerRadius = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Прозрачность края:", "Edge transparency:")
-                from: 0; to: 100; value: page.cfg_edgeOpacity
-                textFromValue: function(v) { return v + "%" }
-                valueFromText: function(t) { return parseInt(t) || 0 }
-                onValueModified: page.cfg_edgeOpacity = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Ширина перехода:", "Fade width:")
-                from: 0; to: 96; value: page.cfg_edgeWidth
-                textFromValue: function(v) { return v + " px" }
-                valueFromText: function(t) { return parseInt(t) || 0 }
-                onValueModified: page.cfg_edgeWidth = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Кривая перехода:", "Fade curve:")
-                from: -100; to: 100; stepSize: 5; value: page.cfg_edgeCurve
-                textFromValue: function(v) { return v === 0 ? page.tr2("0 — ровная", "0 — balanced") : (v > 0 ? "+" : "") + v }
-                valueFromText: function(t) { return parseInt(t) || 0 }
-                onValueModified: page.cfg_edgeCurve = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Отступ содержимого:", "Content padding:")
-                from: 8; to: 64; stepSize: 2; value: page.cfg_contentPadding
-                textFromValue: function(v) { return v + " px" }
-                valueFromText: function(t) { return parseInt(t) || 8 }
-                onValueModified: page.cfg_contentPadding = value
-            }
+        ColorPicker {
+            Kirigami.FormData.label: page.tr2("Цвет текста:", "Text color:")
+            Layout.fillWidth: true
+            label: ""
+            labelTheme:  page.tr2("Из темы", "From theme")
+            labelCustom: page.tr2("Свой",    "Custom")
+            mode:     page.cfg_textColorMode
+            hexColor: page.cfg_textColor
+            onModeSelected: function(m) { page.cfg_textColorMode = m }
+            onColorPicked:  function(h) { page.cfg_textColor = h }
+        }
 
-            // ---- Refresh ----
-            Kirigami.Separator { Kirigami.FormData.isSection: true }
-            Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Обновление", "Refresh") }
+        QQC2.CheckBox {
+            Kirigami.FormData.label: page.tr2("Углы:", "Corners:")
+            text: page.tr2("Включить скругление", "Enable rounding")
+            checked: page.cfg_rounded
+            onToggled: page.cfg_rounded = checked
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Радиус:", "Radius:")
+            from: 0; to: 80; value: page.cfg_cornerRadius; enabled: page.cfg_rounded
+            textFromValue: function(v) { return v + " px" }
+            valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
+            onValueModified: page.cfg_cornerRadius = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Прозрачность края:", "Edge transparency:")
+            from: 0; to: 100; value: page.cfg_edgeOpacity
+            textFromValue: function(v) { return v + "%" }
+            valueFromText: function(t) { return parseInt(t) || 0 }
+            onValueModified: page.cfg_edgeOpacity = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Ширина перехода:", "Fade width:")
+            from: 0; to: 96; value: page.cfg_edgeWidth
+            textFromValue: function(v) { return v + " px" }
+            valueFromText: function(t) { return parseInt(t) || 0 }
+            onValueModified: page.cfg_edgeWidth = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Кривая перехода:", "Fade curve:")
+            from: -100; to: 100; stepSize: 5; value: page.cfg_edgeCurve
+            textFromValue: function(v) { return v === 0 ? page.tr2("0 — ровная", "0 — balanced") : (v > 0 ? "+" : "") + v }
+            valueFromText: function(t) { return parseInt(t) || 0 }
+            onValueModified: page.cfg_edgeCurve = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Отступ содержимого:", "Content padding:")
+            from: 8; to: 64; stepSize: 2; value: page.cfg_contentPadding
+            textFromValue: function(v) { return v + " px" }
+            valueFromText: function(t) { return parseInt(t) || 8 }
+            onValueModified: page.cfg_contentPadding = value
+        }
 
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Интервал:", "Interval:")
-                from: 15; to: 1800; stepSize: 15; value: page.cfg_updateInterval
-                textFromValue: function(v) { return v + " " + page.tr2("с", "s") }
-                valueFromText: function(t) { return parseInt(t) || 60 }
-                onValueModified: page.cfg_updateInterval = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Предупреждение:", "Warning:")
-                from: 50; to: page.cfg_criticalPercent - 1; value: page.cfg_warningPercent
-                textFromValue: function(v) { return v + "%" }
-                valueFromText: function(t) { return parseInt(t) || 80 }
-                onValueModified: page.cfg_warningPercent = value
-            }
-            QQC2.SpinBox {
-                Kirigami.FormData.label: page.tr2("Критический уровень:", "Critical:")
-                from: page.cfg_warningPercent + 1; to: 100; value: page.cfg_criticalPercent
-                textFromValue: function(v) { return v + "%" }
-                valueFromText: function(t) { return parseInt(t) || 90 }
-                onValueModified: page.cfg_criticalPercent = value
-            }
-            Item { Kirigami.FormData.isSection: true; implicitHeight: 32 }
+        // ---- Refresh ----
+        Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Обновление", "Refresh") }
+
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Интервал:", "Interval:")
+            from: 15; to: 1800; stepSize: 15; value: page.cfg_updateInterval
+            textFromValue: function(v) { return v + " " + page.tr2("с", "s") }
+            valueFromText: function(t) { return parseInt(t) || 60 }
+            onValueModified: page.cfg_updateInterval = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Предупреждение:", "Warning:")
+            from: 50; to: page.cfg_criticalPercent - 1; value: page.cfg_warningPercent
+            textFromValue: function(v) { return v + "%" }
+            valueFromText: function(t) { return parseInt(t) || 80 }
+            onValueModified: page.cfg_warningPercent = value
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Критический уровень:", "Critical:")
+            from: page.cfg_warningPercent + 1; to: 100; value: page.cfg_criticalPercent
+            textFromValue: function(v) { return v + "%" }
+            valueFromText: function(t) { return parseInt(t) || 90 }
+            onValueModified: page.cfg_criticalPercent = value
         }
     }
 }
