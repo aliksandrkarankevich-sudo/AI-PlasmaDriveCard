@@ -89,7 +89,7 @@ QQC2.ScrollView {
         + _fontPx(13) + Math.max(2, cfg_progressHeight)
         + _rowGapV * 4
 
-    // ── профили ──────────────────────────────────────────────────────
+    // ---- profiles ----
     function _loadProfiles() {
         if (!cfg_profiles || cfg_profiles.trim() === "") return []
         try { return JSON.parse(cfg_profiles) } catch(e) { return [] }
@@ -177,9 +177,6 @@ QQC2.ScrollView {
         Component.onCompleted: reload()
     }
 
-    // ── обёртка-контейнер для ScrollView ───────────────────────────────
-    // ScrollView в Plasma 6 / Qt 6 требует явный implicitHeight на дочернем элементе.
-    // Item с явным height: childrenRect.height решает это.
     Item {
         implicitWidth:  page.availableWidth
         implicitHeight: formLayout.implicitHeight + 48
@@ -192,7 +189,7 @@ QQC2.ScrollView {
             anchors.right: parent.right
             anchors.margins: Kirigami.Units.largeSpacing
 
-            // ── Профили ─────────────────────────────────────────────────
+            // ---- Profiles ----
             Kirigami.Separator { Kirigami.FormData.isSection: true }
             Kirigami.Heading {
                 Kirigami.FormData.isSection: true; level: 3
@@ -246,7 +243,7 @@ QQC2.ScrollView {
                 }
             }
 
-            // ── Язык ────────────────────────────────────────────────
+            // ---- Language ----
             Kirigami.Separator { Kirigami.FormData.isSection: true }
             QQC2.ComboBox {
                 Kirigami.FormData.label: page.tr2("Язык:", "Language:")
@@ -255,7 +252,7 @@ QQC2.ScrollView {
                 onActivated: page.cfg_language = currentIndex === 1 ? "en" : "ru"
             }
 
-            // ── Размер ───────────────────────────────────────────────
+            // ---- Size ----
             Kirigami.Separator { Kirigami.FormData.isSection: true }
             Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Размер", "Size") }
 
@@ -280,7 +277,7 @@ QQC2.ScrollView {
             QQC2.SpinBox {
                 Kirigami.FormData.label: page.tr2("Отступ между дисками:", "Gap between drives:")
                 from: 0; to: 32; stepSize: 1; value: page.cfg_separatorHeight
-                textFromValue: function(v) { return v === 0 ? page.tr2("выключён", "off") : v + " px" }
+                textFromValue: function(v) { return v === 0 ? page.tr2("выключен", "off") : v + " px" }
                 valueFromText: function(t) { return parseInt(t) || 0 }
                 onValueModified: page.cfg_separatorHeight = value
             }
@@ -306,7 +303,7 @@ QQC2.ScrollView {
                 onValueModified: page.cfg_maxHeight = value
             }
 
-            // ── Содержимое ───────────────────────────────────────────
+            // ---- Content ----
             Kirigami.Separator { Kirigami.FormData.isSection: true }
             Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Содержимое", "Content") }
 
@@ -352,7 +349,7 @@ QQC2.ScrollView {
                 onValueModified: page.cfg_activityInterval = value
             }
 
-            // ── Оформление ───────────────────────────────────────────
+            // ---- Appearance ----
             Kirigami.Separator { Kirigami.FormData.isSection: true }
             Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Оформление", "Appearance") }
 
@@ -372,8 +369,8 @@ QQC2.ScrollView {
                 labelCustom: page.tr2("Свой",    "Custom")
                 mode:     page.cfg_backgroundColorMode
                 hexColor: page.cfg_backgroundColor
-                onModeChanged:  function(m) { page.cfg_backgroundColorMode = m }
-                onColorChanged: function(h) { page.cfg_backgroundColor = h }
+                onModeSelected: function(m) { page.cfg_backgroundColorMode = m }
+                onColorPicked:  function(h) { page.cfg_backgroundColor = h }
             }
 
             QQC2.SpinBox {
@@ -392,8 +389,8 @@ QQC2.ScrollView {
                 labelCustom: page.tr2("Свой",    "Custom")
                 mode:     page.cfg_textColorMode
                 hexColor: page.cfg_textColor
-                onModeChanged:  function(m) { page.cfg_textColorMode = m }
-                onColorChanged: function(h) { page.cfg_textColor = h }
+                onModeSelected: function(m) { page.cfg_textColorMode = m }
+                onColorPicked:  function(h) { page.cfg_textColor = h }
             }
 
             QQC2.CheckBox {
@@ -438,7 +435,7 @@ QQC2.ScrollView {
                 onValueModified: page.cfg_contentPadding = value
             }
 
-            // ── Обновление ──────────────────────────────────────────
+            // ---- Refresh ----
             Kirigami.Separator { Kirigami.FormData.isSection: true }
             Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Обновление", "Refresh") }
 

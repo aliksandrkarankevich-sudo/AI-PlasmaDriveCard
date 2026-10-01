@@ -1,4 +1,4 @@
-// ColorPicker.qml — RGB ползунки + превью + выбор режима (тема / свой)
+// ColorPicker.qml - RGB sliders + preview + mode switch (theme / custom)
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -8,28 +8,26 @@ ColumnLayout {
     id: root
     spacing: Kirigami.Units.smallSpacing
 
-    // ── публичный интерфейс ──────────────────────────────────────────────
     // mode: "theme" | "custom"
     property string mode:  "theme"
-    // hexColor: строка вида "#rrggbb"
+    // hexColor: "#rrggbb"
     property string hexColor: "#ffffff"
-    // label показывается над пикером
     property string label: ""
-    // тексты для режимов (для локализации снаружи)
     property string labelTheme:  "Из темы"
     property string labelCustom: "Свой"
 
-    signal modeChanged(string newMode)
-    signal colorChanged(string newHex)
+    // NOTE: must NOT be named modeChanged/colorChanged - those clash with
+    // auto-generated property change signals and break QML loading.
+    signal modeSelected(string newMode)
+    signal colorPicked(string newHex)
 
-    // ── внутреннее состояние RGB ─────────────────────────────────────────
     property int _r: 255
     property int _g: 255
     property int _b: 255
     property bool _updating: false
 
     function _hexToRgb(hex) {
-        var h = hex.replace("#", "")
+        var h = (hex || "").replace("#", "")
         if (h.length !== 6) return
         _updating = true
         _r = parseInt(h.substring(0, 2), 16)
@@ -49,14 +47,13 @@ ColumnLayout {
         var h = _rgbToHex()
         if (h !== hexColor) {
             hexColor = h
-            root.colorChanged(h)
+            root.colorPicked(h)
         }
     }
 
     onHexColorChanged: _hexToRgb(hexColor)
     Component.onCompleted: _hexToRgb(hexColor)
 
-    // ── режим ────────────────────────────────────────────────────────────
     RowLayout {
         Layout.fillWidth: true
         spacing: Kirigami.Units.smallSpacing
@@ -71,24 +68,22 @@ ColumnLayout {
             text: root.labelTheme
             checked: root.mode === "theme"
             QQC2.ButtonGroup.group: modeGroup
-            onClicked: { root.mode = "theme"; root.modeChanged("theme") }
+            onClicked: { root.mode = "theme"; root.modeSelected("theme") }
         }
         QQC2.RadioButton {
             text: root.labelCustom
             checked: root.mode === "custom"
             QQC2.ButtonGroup.group: modeGroup
-            onClicked: { root.mode = "custom"; root.modeChanged("custom") }
+            onClicked: { root.mode = "custom"; root.modeSelected("custom") }
         }
     }
 
-    // ── ползунки + превью (только если mode === "custom") ────────────────
     ColumnLayout {
         Layout.fillWidth: true
         spacing: Kirigami.Units.smallSpacing
         visible: root.mode === "custom"
         enabled: root.mode === "custom"
 
-        // Превью
         Rectangle {
             Layout.fillWidth: true
             height: 32
@@ -106,7 +101,6 @@ ColumnLayout {
             }
         }
 
-        // R
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
@@ -130,7 +124,6 @@ ColumnLayout {
             QQC2.Label { text: root._r; Layout.preferredWidth: 28; horizontalAlignment: Text.AlignRight }
         }
 
-        // G
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
@@ -154,7 +147,6 @@ ColumnLayout {
             QQC2.Label { text: root._g; Layout.preferredWidth: 28; horizontalAlignment: Text.AlignRight }
         }
 
-        // B
         RowLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
