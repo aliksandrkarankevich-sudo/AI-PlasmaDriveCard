@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
+import QtQuick.Dialogs
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 
@@ -19,6 +20,7 @@ KCM.SimpleKCM {
     property bool   cfg_showFs
     property bool   cfg_showPhysical
     property string cfg_iconStyle
+    property string cfg_customIconPath
     property bool   cfg_showActivity
     property int    cfg_activityInterval
     property int    cfg_backgroundOpacity
@@ -41,30 +43,31 @@ KCM.SimpleKCM {
 
     property string cfg_languageDefault:            "ru"
     property bool   cfg_autoFitDefault:             true
-    property int    cfg_rowPaddingVDefault:         10
-    property int    cfg_separatorHeightDefault:     4
-    property int    cfg_textScaleDefault:           100
-    property int    cfg_progressHeightDefault:      8
+    property int    cfg_rowPaddingVDefault:         4
+    property int    cfg_separatorHeightDefault:     1
+    property int    cfg_textScaleDefault:           95
+    property int    cfg_progressHeightDefault:      9
     property int    cfg_maxHeightDefault:           720
     property bool   cfg_showRootDefault:            true
     property bool   cfg_showBootDefault:            false
     property bool   cfg_showFsDefault:              true
     property bool   cfg_showPhysicalDefault:        true
     property string cfg_iconStyleDefault:           "drive"
+    property string cfg_customIconPathDefault:      ""
     property bool   cfg_showActivityDefault:        true
     property int    cfg_activityIntervalDefault:    2
-    property int    cfg_backgroundOpacityDefault:   40
+    property int    cfg_backgroundOpacityDefault:   60
     property string cfg_backgroundColorModeDefault: "theme"
     property string cfg_backgroundColorDefault:     "#20242b"
     property int    cfg_textOpacityDefault:         90
     property string cfg_textColorModeDefault:       "theme"
     property string cfg_textColorDefault:           "#eff0f1"
     property bool   cfg_roundedDefault:             true
-    property int    cfg_cornerRadiusDefault:        15
+    property int    cfg_cornerRadiusDefault:        30
     property int    cfg_edgeOpacityDefault:         100
-    property int    cfg_edgeWidthDefault:           30
-    property int    cfg_edgeCurveDefault:           0
-    property int    cfg_contentPaddingDefault:      24
+    property int    cfg_edgeWidthDefault:           60
+    property int    cfg_edgeCurveDefault:           -10
+    property int    cfg_contentPaddingDefault:      10
     property int    cfg_updateIntervalDefault:      60
     property int    cfg_warningPercentDefault:      80
     property int    cfg_criticalPercentDefault:     90
@@ -84,13 +87,27 @@ KCM.SimpleKCM {
         + _fontPx(13) + Math.max(2, cfg_progressHeight)
         + _rowGapV * 4
 
+    readonly property var _iconStyles: [
+        { id: "drive",            ru: "Авто (по типу диска)", en: "Auto (by drive type)" },
+        { id: "folder",           ru: "Папка",                en: "Folder" },
+        { id: "folder-open",      ru: "Открытая папка",       en: "Open folder" },
+        { id: "folder-documents", ru: "Папка с документами",  en: "Documents folder" },
+        { id: "computer",         ru: "Компьютер",            en: "Computer" },
+        { id: "custom",           ru: "Свой файл…",           en: "Custom file…" }
+    ]
+    function _iconIndex() {
+        for (var i = 0; i < _iconStyles.length; ++i)
+            if (_iconStyles[i].id === cfg_iconStyle) return i
+        return 0
+    }
+
     // ---- built-in factory profile (never stored, cannot be deleted/overwritten) ----
     readonly property string _factoryId: "__default__"
     readonly property var _factory: ({
         autoFit: true, rowPaddingV: 4, separatorHeight: 1,
         textScale: 95, progressHeight: 9, maxHeight: 720,
-        showRoot: true, showBoot: true, showFs: true, showPhysical: true,
-        iconStyle: "drive", showActivity: true, activityInterval: 2,
+        showRoot: true, showBoot: false, showFs: true, showPhysical: true,
+        iconStyle: "drive", customIconPath: "", showActivity: true, activityInterval: 2,
         backgroundOpacity: 60, backgroundColorMode: "theme", backgroundColor: "#20242b",
         textOpacity: 90, textColorMode: "theme", textColor: "#eff0f1",
         rounded: true, cornerRadius: 30,
@@ -120,6 +137,7 @@ KCM.SimpleKCM {
             textScale: cfg_textScale, progressHeight: cfg_progressHeight,
             maxHeight: cfg_maxHeight, showRoot: cfg_showRoot, showBoot: cfg_showBoot,
             showFs: cfg_showFs, showPhysical: cfg_showPhysical, iconStyle: cfg_iconStyle,
+            customIconPath: cfg_customIconPath,
             showActivity: cfg_showActivity, activityInterval: cfg_activityInterval,
             backgroundOpacity: cfg_backgroundOpacity,
             backgroundColorMode: cfg_backgroundColorMode, backgroundColor: cfg_backgroundColor,
@@ -162,6 +180,7 @@ KCM.SimpleKCM {
         cfg_showFs              = p.showFs              !== undefined ? p.showFs              : cfg_showFsDefault
         cfg_showPhysical        = p.showPhysical        !== undefined ? p.showPhysical        : cfg_showPhysicalDefault
         cfg_iconStyle           = p.iconStyle           !== undefined ? p.iconStyle           : cfg_iconStyleDefault
+        cfg_customIconPath      = p.customIconPath      !== undefined ? p.customIconPath      : cfg_customIconPathDefault
         cfg_showActivity        = p.showActivity        !== undefined ? p.showActivity        : cfg_showActivityDefault
         cfg_activityInterval    = p.activityInterval    !== undefined ? p.activityInterval    : cfg_activityIntervalDefault
         cfg_backgroundOpacity   = p.backgroundOpacity   !== undefined ? p.backgroundOpacity   : cfg_backgroundOpacityDefault
@@ -198,6 +217,17 @@ KCM.SimpleKCM {
             for (var i = 0; i < names.length; ++i) append({ pname: names[i], builtin: false })
         }
         Component.onCompleted: reload()
+    }
+
+    FileDialog {
+        id: iconDialog
+        title: page.tr2("Выберите значок", "Choose an icon")
+        nameFilters: [page.tr2("Изображения (*.svg *.svgz *.png)", "Images (*.svg *.svgz *.png)")]
+        onAccepted: {
+            var p = decodeURIComponent(selectedFile.toString().replace(/^file:\/\//, ""))
+            page.cfg_customIconPath = p
+            page.cfg_iconStyle = "custom"
+        }
     }
 
     Kirigami.FormLayout {
@@ -284,7 +314,7 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: page.tr2("Отступ строки:", "Row padding:")
             from: 4; to: 40; stepSize: 2; value: page.cfg_rowPaddingV
             textFromValue: function(v) { return v + " px" }
-            valueFromText: function(t) { return parseInt(t) || 10 }
+            valueFromText: function(t) { return parseInt(t) || 4 }
             onValueModified: page.cfg_rowPaddingV = value
         }
         QQC2.SpinBox {
@@ -298,14 +328,14 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: page.tr2("Масштаб текста:", "Text scale:")
             from: 70; to: 160; stepSize: 5; value: page.cfg_textScale
             textFromValue: function(v) { return v + "%" }
-            valueFromText: function(t) { return parseInt(t) || 100 }
+            valueFromText: function(t) { return parseInt(t) || 95 }
             onValueModified: page.cfg_textScale = value
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Толщина полосы:", "Bar thickness:")
             from: 4; to: 48; value: page.cfg_progressHeight
             textFromValue: function(v) { return v + " px" }
-            valueFromText: function(t) { return parseInt(t) || 8 }
+            valueFromText: function(t) { return parseInt(t) || 9 }
             onValueModified: page.cfg_progressHeight = value
         }
         QQC2.SpinBox {
@@ -336,16 +366,31 @@ KCM.SimpleKCM {
             checked: page.cfg_showFs
             onToggled: page.cfg_showFs = checked
         }
-        QQC2.CheckBox {
-            text: page.tr2("Показывать физический диск кратко", "Show short physical drive")
-            checked: page.cfg_showPhysical
-            onToggled: page.cfg_showPhysical = checked
-        }
         QQC2.ComboBox {
             Kirigami.FormData.label: page.tr2("Значок:", "Icon:")
-            model: [page.tr2("Диск", "Drive"), page.tr2("Папка", "Folder"), page.tr2("Открытая папка", "Open folder")]
-            currentIndex: page.cfg_iconStyle === "folder" ? 1 : (page.cfg_iconStyle === "folder-open" ? 2 : 0)
-            onActivated: page.cfg_iconStyle = currentIndex === 1 ? "folder" : (currentIndex === 2 ? "folder-open" : "drive")
+            model: page._iconStyles.map(function(s) { return page.ru ? s.ru : s.en })
+            currentIndex: page._iconIndex()
+            onActivated: {
+                var id = page._iconStyles[currentIndex].id
+                page.cfg_iconStyle = id
+                if (id === "custom" && !page.cfg_customIconPath) iconDialog.open()
+            }
+        }
+        RowLayout {
+            Kirigami.FormData.label: page.tr2("Свой значок:", "Custom icon:")
+            Layout.fillWidth: true
+            visible: page.cfg_iconStyle === "custom"
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.TextField {
+                Layout.fillWidth: true
+                text: page.cfg_customIconPath
+                placeholderText: "/home/…/icon.svg"
+                onEditingFinished: page.cfg_customIconPath = text.trim()
+            }
+            QQC2.Button {
+                text: page.tr2("Выбрать…", "Browse…")
+                onClicked: iconDialog.open()
+            }
         }
         QQC2.CheckBox {
             Kirigami.FormData.label: page.tr2("Активность:", "Activity:")
@@ -442,7 +487,7 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: page.tr2("Отступ содержимого:", "Content padding:")
             from: 8; to: 64; stepSize: 2; value: page.cfg_contentPadding
             textFromValue: function(v) { return v + " px" }
-            valueFromText: function(t) { return parseInt(t) || 8 }
+            valueFromText: function(t) { return parseInt(t) || 10 }
             onValueModified: page.cfg_contentPadding = value
         }
 

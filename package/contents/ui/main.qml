@@ -155,9 +155,9 @@ PlasmoidItem {
        return isRota(n.rota) ? "HDD" : "SSD"
    }
    function makeGroup(g) {
-       var n = g.entry.node
        if (!g) return { key: "other", kind: "hdd", title: tr2("Прочее", "Other"),
                         sub: "", rows: [], hasRoot: false }
+       var n = g.entry.node
        if (g.raid) {
            var t = n.type || ""
            var level = t.indexOf("raid") === 0 ? "RAID " + t.substring(4) : "RAID"
