@@ -4,6 +4,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Dialogs
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
+import org.kde.plasma.plasma5support as Plasma5Support
 
 KCM.SimpleKCM {
     id: page
@@ -20,6 +21,7 @@ KCM.SimpleKCM {
     property bool   cfg_showFs
     property string cfg_iconStyle
     property string cfg_customIconPath
+    property string cfg_volumeOverrides
     property bool   cfg_showActivity
     property int    cfg_activityInterval
     property int    cfg_backgroundOpacity
@@ -52,6 +54,7 @@ KCM.SimpleKCM {
     property bool   cfg_showFsDefault:              true
     property string cfg_iconStyleDefault:           "drive"
     property string cfg_customIconPathDefault:      ""
+    property string cfg_volumeOverridesDefault:     ""
     property bool   cfg_showActivityDefault:        true
     property int    cfg_activityIntervalDefault:    2
     property int    cfg_backgroundOpacityDefault:   60
@@ -89,13 +92,74 @@ KCM.SimpleKCM {
         return 0
     }
 
+    // ---- per-volume icon overrides (key = mount point) ----
+    property string ovTarget: ""
+    property var    mountList: []
+
+    function _ovAll() {
+        try {
+            var o = JSON.parse(cfg_volumeOverrides || "{}")
+            return (o && typeof o === "object" && !Array.isArray(o)) ? o : ({})
+        } catch (e) { return ({}) }
+    }
+    function _ovEntry(target) {
+        var e = _ovAll()[target]
+        return (e && typeof e === "object") ? e : ({})
+    }
+    function _ovIcon(target) { return _ovEntry(target).icon || "" }
+    function _ovSize(target) {
+        var s = Number(_ovEntry(target).size)
+        return (isFinite(s) && s >= 50 && s <= 300) ? Math.round(s) : 100
+    }
+    function _ovSet(target, icon, size) {
+        if (!target) return
+        var all = _ovAll()
+        var e = ({})
+        if (icon) e.icon = icon
+        if (size && size !== 100) e.size = size
+        if (Object.keys(e).length === 0) delete all[target]
+        else all[target] = e
+        cfg_volumeOverrides = Object.keys(all).length ? JSON.stringify(all) : ""
+    }
+    function _ovSummary() {
+        var all = _ovAll()
+        var keys = Object.keys(all)
+        if (!keys.length) return tr2("Переопределений нет", "No overrides")
+        return keys.map(function(k) {
+            var e = all[k]
+            var parts = []
+            if (e.icon) parts.push(tr2("значок", "icon"))
+            if (e.size) parts.push(e.size + "%")
+            return k + " (" + parts.join(", ") + ")"
+        }).join("\n")
+    }
+
+    Plasma5Support.DataSource {
+        id: mountScan
+        engine: "executable"
+        readonly property string cmd: "findmnt -rn --real -o TARGET"
+        onNewData: function(sourceName, data) {
+            disconnectSource(sourceName)
+            var lines = (data["stdout"] || "").split("\n")
+            var out = []
+            for (var i = 0; i < lines.length; ++i) {
+                var t = lines[i].trim().replace(/\\x20/g, " ")
+                if (t && out.indexOf(t) < 0) out.push(t)
+            }
+            page.mountList = out
+            if (!page.ovTarget && out.length) page.ovTarget = out[0]
+        }
+        Component.onCompleted: connectSource(cmd)
+    }
+
     // ---- built-in factory profile (never stored, cannot be deleted/overwritten) ----
     readonly property string _factoryId: "__default__"
     readonly property var _factory: ({
         autoFit: true, rowPaddingV: 4, separatorHeight: 1,
         textScale: 95, progressHeight: 9, maxHeight: 720,
         showRoot: true, showBoot: false, showFs: true,
-        iconStyle: "drive", customIconPath: "", showActivity: true, activityInterval: 2,
+        iconStyle: "drive", customIconPath: "", volumeOverrides: "",
+        showActivity: true, activityInterval: 2,
         backgroundOpacity: 60, backgroundColorMode: "theme", backgroundColor: "#20242b",
         textOpacity: 90, textColorMode: "theme", textColor: "#eff0f1",
         rounded: true, cornerRadius: 30,
@@ -126,6 +190,7 @@ KCM.SimpleKCM {
             maxHeight: cfg_maxHeight, showRoot: cfg_showRoot, showBoot: cfg_showBoot,
             showFs: cfg_showFs, iconStyle: cfg_iconStyle,
             customIconPath: cfg_customIconPath,
+            volumeOverrides: cfg_volumeOverrides,
             showActivity: cfg_showActivity, activityInterval: cfg_activityInterval,
             backgroundOpacity: cfg_backgroundOpacity,
             backgroundColorMode: cfg_backgroundColorMode, backgroundColor: cfg_backgroundColor,
@@ -168,6 +233,7 @@ KCM.SimpleKCM {
         cfg_showFs              = p.showFs              !== undefined ? p.showFs              : cfg_showFsDefault
         cfg_iconStyle           = p.iconStyle           !== undefined ? p.iconStyle           : cfg_iconStyleDefault
         cfg_customIconPath      = p.customIconPath      !== undefined ? p.customIconPath      : cfg_customIconPathDefault
+        cfg_volumeOverrides     = p.volumeOverrides     !== undefined ? p.volumeOverrides     : cfg_volumeOverridesDefault
         cfg_showActivity        = p.showActivity        !== undefined ? p.showActivity        : cfg_showActivityDefault
         cfg_activityInterval    = p.activityInterval    !== undefined ? p.activityInterval    : cfg_activityIntervalDefault
         cfg_backgroundOpacity   = p.backgroundOpacity   !== undefined ? p.backgroundOpacity   : cfg_backgroundOpacityDefault
@@ -214,6 +280,17 @@ KCM.SimpleKCM {
             var p = decodeURIComponent(selectedFile.toString().replace(/^file:\/\//, ""))
             page.cfg_customIconPath = p
             page.cfg_iconStyle = "custom"
+        }
+    }
+
+    FileDialog {
+        id: volumeIconDialog
+        title: page.tr2("Значок для тома", "Icon for volume")
+        nameFilters: [page.tr2("Изображения (*.svg *.svgz *.png *.jpg *.jpeg *.webp)",
+                               "Images (*.svg *.svgz *.png *.jpg *.jpeg *.webp)")]
+        onAccepted: {
+            var p = decodeURIComponent(selectedFile.toString().replace(/^file:\/\//, ""))
+            page._ovSet(page.ovTarget, p, page._ovSize(page.ovTarget))
         }
     }
 
@@ -385,6 +462,59 @@ KCM.SimpleKCM {
             textFromValue: function(v) { return v + " " + page.tr2("с", "s") }
             valueFromText: function(t) { return parseInt(t) || 2 }
             onValueModified: page.cfg_activityInterval = value
+        }
+
+        // ---- Volume icons ----
+        Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Значки томов", "Volume icons") }
+
+        QQC2.ComboBox {
+            id: ovCombo
+            Kirigami.FormData.label: page.tr2("Том (точка монтирования):", "Volume (mount point):")
+            Layout.fillWidth: true
+            editable: true
+            model: page.mountList
+            editText: page.ovTarget
+            onActivated: page.ovTarget = currentText
+            onAccepted: page.ovTarget = editText.trim()
+        }
+        RowLayout {
+            Kirigami.FormData.label: page.tr2("Картинка:", "Picture:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            QQC2.TextField {
+                Layout.fillWidth: true
+                enabled: page.ovTarget.length > 0
+                text: page._ovIcon(page.ovTarget)
+                placeholderText: page.tr2("Путь к файлу или имя иконки из темы", "File path or theme icon name")
+                onEditingFinished: page._ovSet(page.ovTarget, text.trim(), page._ovSize(page.ovTarget))
+            }
+            QQC2.Button {
+                text: page.tr2("Выбрать…", "Browse…")
+                enabled: page.ovTarget.length > 0
+                onClicked: volumeIconDialog.open()
+            }
+        }
+        QQC2.SpinBox {
+            Kirigami.FormData.label: page.tr2("Размер значка:", "Icon size:")
+            enabled: page.ovTarget.length > 0
+            from: 50; to: 300; stepSize: 10
+            value: page._ovSize(page.ovTarget)
+            textFromValue: function(v) { return v + "%" }
+            valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? 100 : n }
+            onValueModified: page._ovSet(page.ovTarget, page._ovIcon(page.ovTarget), value)
+        }
+        QQC2.Button {
+            text: page.tr2("Сбросить для этого тома", "Reset for this volume")
+            enabled: page.ovTarget.length > 0
+                && (page._ovIcon(page.ovTarget).length > 0 || page._ovSize(page.ovTarget) !== 100)
+            onClicked: page._ovSet(page.ovTarget, "", 100)
+        }
+        QQC2.Label {
+            Kirigami.FormData.label: page.tr2("Задано:", "Configured:")
+            Layout.fillWidth: true
+            text: page._ovSummary()
+            wrapMode: Text.Wrap
+            opacity: 0.8
         }
 
         // ---- Appearance ----
