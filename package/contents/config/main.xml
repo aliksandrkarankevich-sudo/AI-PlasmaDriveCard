@@ -17,6 +17,7 @@
     <entry name="showFs"             type="Bool">  <default>true</default></entry>
     <entry name="iconStyle"          type="String"><default>drive</default></entry>
     <entry name="customIconPath"     type="String"><default></default></entry>
+    <entry name="volumeOverrides"    type="String"><default></default></entry>
     <entry name="showActivity"       type="Bool">  <default>true</default></entry>
     <entry name="activityInterval"   type="Int">   <default>2</default></entry>
     <entry name="backgroundOpacity"  type="Int">   <default>60</default></entry>

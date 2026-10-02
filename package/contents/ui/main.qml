@@ -53,6 +53,7 @@ PlasmoidItem {
    property bool pendingRefresh:  false
    property var  previousIo:      ({})
    property real _lastScanMs:     0
+   property var  overrides:       ({})
 
    function tr2(r, e) { return ru ? r : e }
    function fontPx(base) {
@@ -72,7 +73,39 @@ PlasmoidItem {
        if (kind === "ssd")  return "drive-harddisk-solidstate"
        return "drive-harddisk"
    }
+
+   // ---- переопределения значка и размера для конкретного тома ----------
+   // volumeOverrides: JSON вида {"/home": {"icon": "/путь/к/файлу.png" | "имя-иконки", "size": 150}}
+   // Ключ - точка монтирования; size - процент от обычного размера значка.
+   function loadOverrides() {
+       var parsed = ({})
+       try {
+           var raw = Plasmoid.configuration.volumeOverrides || ""
+           if (raw.length) {
+               var obj = JSON.parse(raw)
+               if (obj && typeof obj === "object" && !Array.isArray(obj)) parsed = obj
+           }
+       } catch (error) {
+           console.warn("DriveCard overrides JSON:", error)
+       }
+       overrides = parsed
+   }
+   function overrideFor(target) {
+       var ov = overrides[target]
+       return (ov && typeof ov === "object") ? ov : null
+   }
+   function iconScaleFor(target) {
+       var ov = overrideFor(target)
+       var s = ov ? Number(ov.size) : 100
+       if (!isFinite(s) || s <= 0) s = 100
+       return Math.round(Math.max(50, Math.min(300, s)))
+   }
    function displayIcon(target, kind) {
+       var ov = overrideFor(target)
+       if (ov && ov.icon) {
+           var oi = String(ov.icon)
+           return oi.indexOf("/") === 0 ? "file://" + encodePath(oi) : oi
+       }
        var st = Plasmoid.configuration.iconStyle
        if (st === "folder")           return "folder"
        if (st === "folder-open")      return "folder-open"
@@ -180,11 +213,13 @@ PlasmoidItem {
    function blankRow() {
        return { title: "", target: "", source: "", fs: "", physical: "",
                 total: 0, available: 0, used: 0, driveIcon: "", kname: "",
-                active: false, isHeader: false, groupSub: "", kind: "" }
+                active: false, isHeader: false, groupSub: "", kind: "",
+                iconScale: 100 }
    }
 
    readonly property var syncKeys: ["title", "target", "source", "fs", "physical",
-       "total", "available", "used", "driveIcon", "kname", "groupSub", "kind"]
+       "total", "available", "used", "driveIcon", "kname", "groupSub", "kind",
+       "iconScale"]
 
    function syncModel(items) {
        var same = drives.count === items.length
@@ -258,6 +293,7 @@ PlasmoidItem {
            row.total = size; row.available = available; row.used = used
            row.kind = grp.kind
            row.driveIcon = displayIcon(target, grp.kind)
+           row.iconScale = iconScaleFor(target)
            row.kname = (ent && ent.node.kname) ? ent.node.kname : devName
            grp.rows.push(row)
            seen[source] = true
@@ -329,6 +365,7 @@ PlasmoidItem {
            var row = drives.get(i)
            if (row.isHeader) continue
            drives.setProperty(i, "driveIcon", displayIcon(row.target, row.kind))
+           drives.setProperty(i, "iconScale", iconScaleFor(row.target))
        }
    }
    function scheduleStorageRefresh() {
@@ -434,6 +471,7 @@ PlasmoidItem {
        function onShowBootChanged()        { root.refresh(0) }
        function onIconStyleChanged()       { root.refreshIcons() }
        function onCustomIconPathChanged()  { root.refreshIcons() }
+       function onVolumeOverridesChanged() { root.loadOverrides(); root.refreshIcons() }
        function onLanguageChanged()        { root.scheduleStorageRefresh() }
        function onTextScaleChanged()       { root.scheduleStorageRefresh() }
        function onRowPaddingVChanged()     { root.scheduleStorageRefresh() }
@@ -443,7 +481,10 @@ PlasmoidItem {
        function onAutoFitChanged()         { root.scheduleStorageRefresh() }
    }
 
-   Component.onCompleted: Qt.callLater(function() { root.refresh(0) })
+   Component.onCompleted: {
+       root.loadOverrides()
+       Qt.callLater(function() { root.refresh(0) })
+   }
 
    fullRepresentation: Item {
        id: view
@@ -549,6 +590,7 @@ PlasmoidItem {
                    required property bool   isHeader
                    required property string groupSub
                    required property string kind
+                   required property int    iconScale
                    required property int    index
 
                    function measureRow() {
@@ -638,8 +680,8 @@ PlasmoidItem {
                        visible: !isHeader
 
                        Item {
-                           Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
-                           Layout.preferredHeight: Kirigami.Units.iconSizes.medium
+                           Layout.preferredWidth:  Math.round(Kirigami.Units.iconSizes.medium * iconScale / 100.0)
+                           Layout.preferredHeight: Math.round(Kirigami.Units.iconSizes.medium * iconScale / 100.0)
                            Layout.alignment: Qt.AlignVCenter
                            Kirigami.Icon { anchors.fill: parent; source: driveIcon }
                            Rectangle {
