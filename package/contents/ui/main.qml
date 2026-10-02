@@ -18,7 +18,6 @@ PlasmoidItem {
    readonly property int  rowPadV: Math.max(4, Plasmoid.configuration.rowPaddingV)
    readonly property int  maxH:    Plasmoid.configuration.maxHeight
    readonly property int  minH:    Kirigami.Units.gridUnit * 9
-   readonly property int  headerH: Kirigami.Units.gridUnit * 2
    readonly property int  rowGapV: Kirigami.Units.smallSpacing
    readonly property int  progressH: Math.max(2, Plasmoid.configuration.progressHeight)
    readonly property int  groupH:
@@ -31,13 +30,11 @@ PlasmoidItem {
        + rowGapV * 4
    property int measuredRowH: 0
    readonly property int effectiveRowH: measuredRowH > 0 ? measuredRowH : estimatedRowH
-   property int measuredHeaderH: 0
-   readonly property int effectiveHeaderH: Math.max(headerH, measuredHeaderH)
    property int rowCount:   0
    property int groupCount: 0
    readonly property int wantedHeight: Math.max(minH,
        Math.min(maxH,
-           pad * 2 + effectiveHeaderH + rowGapV
+           pad * 2
            + Math.max(1, rowCount) * effectiveRowH
            + groupCount * groupH
            + Math.max(0, drives.count - 1) * sepH))
@@ -526,39 +523,6 @@ PlasmoidItem {
            anchors.fill: parent
            anchors.margins: root.pad
            spacing: Kirigami.Units.smallSpacing
-
-           RowLayout {
-               id: header
-
-               Binding {
-                   target: root
-                   property: "measuredHeaderH"
-                   value: Math.ceil(Math.max(
-                       root.headerH,
-                       header.implicitHeight,
-                       header.Layout.minimumHeight))
-               }
-               Layout.fillWidth:       true
-               Layout.preferredHeight: root.headerH
-               Kirigami.Icon {
-                   source: "drive-harddisk"
-                   Layout.preferredWidth:  Kirigami.Units.iconSizes.smallMedium
-                   Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
-               }
-               PC3.Label {
-                   text:             root.tr2("Диски", "Drives")
-                   color:            view.labelColor
-                   font.bold:        true
-                   font.pixelSize:   root.fontPx(20)
-                   Layout.fillWidth: true
-               }
-               PC3.Label {
-                   text:           root.rowCount
-                   color:          view.labelColor
-                   opacity:        0.72
-                   font.pixelSize: root.fontPx(13)
-               }
-           }
 
            ListView {
                id: list
