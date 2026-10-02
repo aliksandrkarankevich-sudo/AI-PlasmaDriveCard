@@ -8,9 +8,9 @@ ColumnLayout {
     id: root
     spacing: Kirigami.Units.smallSpacing
 
-    // mode: "theme" | "custom"
+    // mode: "theme" | "custom"  (owned by the parent, updated via modeSelected)
     property string mode:  "theme"
-    // hexColor: "#rrggbb"
+    // hexColor: "#rrggbb"      (owned by the parent, updated via colorPicked)
     property string hexColor: "#ffffff"
     property string label: ""
     property string labelTheme:  "Из темы"
@@ -24,16 +24,13 @@ ColumnLayout {
     property int _r: 255
     property int _g: 255
     property int _b: 255
-    property bool _updating: false
 
     function _hexToRgb(hex) {
         var h = (hex || "").replace("#", "")
         if (h.length !== 6) return
-        _updating = true
         _r = parseInt(h.substring(0, 2), 16)
         _g = parseInt(h.substring(2, 4), 16)
         _b = parseInt(h.substring(4, 6), 16)
-        _updating = false
     }
     function _toHex(n) {
         var s = n.toString(16)
@@ -42,13 +39,10 @@ ColumnLayout {
     function _rgbToHex() {
         return "#" + _toHex(_r) + _toHex(_g) + _toHex(_b)
     }
+    // Only emit; the parent writes the new value back into hexColor.
     function _applyRgb() {
-        if (_updating) return
         var h = _rgbToHex()
-        if (h !== hexColor) {
-            hexColor = h
-            root.colorPicked(h)
-        }
+        if (h !== hexColor) root.colorPicked(h)
     }
 
     onHexColorChanged: _hexToRgb(hexColor)
@@ -68,13 +62,13 @@ ColumnLayout {
             text: root.labelTheme
             checked: root.mode === "theme"
             QQC2.ButtonGroup.group: modeGroup
-            onClicked: { root.mode = "theme"; root.modeSelected("theme") }
+            onClicked: root.modeSelected("theme")
         }
         QQC2.RadioButton {
             text: root.labelCustom
             checked: root.mode === "custom"
             QQC2.ButtonGroup.group: modeGroup
-            onClicked: { root.mode = "custom"; root.modeSelected("custom") }
+            onClicked: root.modeSelected("custom")
         }
     }
 
@@ -86,7 +80,7 @@ ColumnLayout {
 
         Rectangle {
             Layout.fillWidth: true
-            height: 32
+            Layout.preferredHeight: 32
             radius: 6
             color: root.hexColor
             border.color: Qt.rgba(0.5, 0.5, 0.5, 0.4)
@@ -109,8 +103,8 @@ ColumnLayout {
                 id: sliderR
                 Layout.fillWidth: true
                 from: 0; to: 255; stepSize: 1
-                value: root._r
                 onMoved: { root._r = Math.round(value); root._applyRgb() }
+                Binding { target: sliderR; property: "value"; value: root._r }
                 background: Rectangle {
                     x: sliderR.leftPadding; y: sliderR.topPadding + sliderR.availableHeight / 2 - height / 2
                     width: sliderR.availableWidth; height: 6; radius: 3
@@ -132,8 +126,8 @@ ColumnLayout {
                 id: sliderG
                 Layout.fillWidth: true
                 from: 0; to: 255; stepSize: 1
-                value: root._g
                 onMoved: { root._g = Math.round(value); root._applyRgb() }
+                Binding { target: sliderG; property: "value"; value: root._g }
                 background: Rectangle {
                     x: sliderG.leftPadding; y: sliderG.topPadding + sliderG.availableHeight / 2 - height / 2
                     width: sliderG.availableWidth; height: 6; radius: 3
@@ -155,8 +149,8 @@ ColumnLayout {
                 id: sliderB
                 Layout.fillWidth: true
                 from: 0; to: 255; stepSize: 1
-                value: root._b
                 onMoved: { root._b = Math.round(value); root._applyRgb() }
+                Binding { target: sliderB; property: "value"; value: root._b }
                 background: Rectangle {
                     x: sliderB.leftPadding; y: sliderB.topPadding + sliderB.availableHeight / 2 - height / 2
                     width: sliderB.availableWidth; height: 6; radius: 3
