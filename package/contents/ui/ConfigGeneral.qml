@@ -84,6 +84,27 @@ KCM.SimpleKCM {
         + _fontPx(13) + Math.max(2, cfg_progressHeight)
         + _rowGapV * 4
 
+    // ---- built-in factory profile (never stored, cannot be deleted/overwritten) ----
+    readonly property string _factoryId: "__default__"
+    readonly property var _factory: ({
+        autoFit: true, rowPaddingV: 4, separatorHeight: 1,
+        textScale: 95, progressHeight: 9, maxHeight: 720,
+        showRoot: true, showBoot: true, showFs: true, showPhysical: true,
+        iconStyle: "drive", showActivity: true, activityInterval: 2,
+        backgroundOpacity: 60, backgroundColorMode: "theme", backgroundColor: "#20242b",
+        textOpacity: 90, textColorMode: "theme", textColor: "#eff0f1",
+        rounded: true, cornerRadius: 30,
+        edgeOpacity: 100, edgeWidth: 60, edgeCurve: -10,
+        contentPadding: 10, updateInterval: 60,
+        warningPercent: 80, criticalPercent: 90
+    })
+    function _factoryLabel() { return tr2("По умолчанию", "Default") }
+    function _displayName(n) { return n === _factoryId ? _factoryLabel() : n }
+    function _isReserved(n) {
+        var t = (n || "").trim().toLowerCase()
+        return t === _factoryId || t === "по умолчанию" || t === "default"
+    }
+
     // ---- profiles ----
     function _loadProfiles() {
         if (!cfg_profiles || cfg_profiles.trim() === "") return []
@@ -111,7 +132,7 @@ KCM.SimpleKCM {
         }
     }
     function saveProfile(name) {
-        if (!name || name.trim() === "") return
+        if (!name || name.trim() === "" || _isReserved(name)) return
         var arr = _loadProfiles()
         var idx = arr.findIndex(function(p) { return p.name === name })
         var snap = _currentSnapshot(name)
@@ -121,8 +142,13 @@ KCM.SimpleKCM {
         profileModel.reload()
     }
     function loadProfile(name) {
-        var arr = _loadProfiles()
-        var p = arr.find(function(x) { return x.name === name })
+        var p
+        if (name === _factoryId) {
+            p = JSON.parse(JSON.stringify(_factory))
+            p.language = cfg_language   // keep the user's current UI language
+        } else {
+            p = _loadProfiles().find(function(x) { return x.name === name })
+        }
         if (!p) return
         cfg_language            = p.language            !== undefined ? p.language            : cfg_languageDefault
         cfg_autoFit             = p.autoFit             !== undefined ? p.autoFit             : cfg_autoFitDefault
@@ -156,6 +182,7 @@ KCM.SimpleKCM {
         cfg_activeProfile = name
     }
     function deleteProfile(name) {
+        if (name === _factoryId) return
         var arr = _loadProfiles().filter(function(p) { return p.name !== name })
         _saveProfiles(arr)
         if (cfg_activeProfile === name) cfg_activeProfile = ""
@@ -166,8 +193,9 @@ KCM.SimpleKCM {
         id: profileModel
         function reload() {
             clear()
+            append({ pname: page._factoryId, builtin: true })
             var names = page._profileNames()
-            for (var i = 0; i < names.length; ++i) append({ pname: names[i] })
+            for (var i = 0; i < names.length; ++i) append({ pname: names[i], builtin: false })
         }
         Component.onCompleted: reload()
     }
@@ -177,13 +205,13 @@ KCM.SimpleKCM {
         Kirigami.Heading {
             Kirigami.FormData.isSection: true; level: 3
             text: page.tr2("Профили настроек", "Settings Profiles")
-                + (page.cfg_activeProfile ? "  —  " + page.cfg_activeProfile : "")
+                + (page.cfg_activeProfile ? "  —  " + page._displayName(page.cfg_activeProfile) : "")
         }
 
         ListView {
             Kirigami.FormData.label: page.tr2("Сохранённые:", "Saved:")
             Layout.fillWidth: true
-            implicitHeight: Math.min(profileModel.count * 40, 160)
+            implicitHeight: Math.min(profileModel.count * 40, 200)
             visible: profileModel.count > 0
             model: profileModel
             clip: true
@@ -192,7 +220,7 @@ KCM.SimpleKCM {
                 height: 38
                 spacing: Kirigami.Units.smallSpacing
                 QQC2.Label {
-                    text: model.pname
+                    text: page._displayName(model.pname)
                     Layout.fillWidth: true
                     elide: Text.ElideRight
                     color: model.pname === page.cfg_activeProfile
@@ -200,10 +228,11 @@ KCM.SimpleKCM {
                     font.bold: model.pname === page.cfg_activeProfile
                 }
                 QQC2.Button {
-                    text: page.tr2("Загрузить", "Load")
+                    text: model.builtin ? page.tr2("Сбросить", "Reset") : page.tr2("Загрузить", "Load")
                     onClicked: page.loadProfile(model.pname)
                 }
                 QQC2.Button {
+                    visible: !model.builtin
                     text: page.tr2("Удалить", "Delete")
                     onClicked: page.deleteProfile(model.pname)
                 }
@@ -218,11 +247,12 @@ KCM.SimpleKCM {
                 id: profileNameField
                 Layout.fillWidth: true
                 placeholderText: page.tr2("Название...", "Name...")
-                text: page.cfg_activeProfile
+                text: page.cfg_activeProfile === page._factoryId ? "" : page.cfg_activeProfile
             }
             QQC2.Button {
                 text: page.tr2("Сохранить", "Save")
                 enabled: profileNameField.text.trim().length > 0
+                    && !page._isReserved(profileNameField.text)
                 onClicked: page.saveProfile(profileNameField.text.trim())
             }
         }

@@ -48,6 +48,42 @@ ColumnLayout {
     onHexColorChanged: _hexToRgb(hexColor)
     Component.onCompleted: _hexToRgb(hexColor)
 
+    // Slider with a gradient groove and an explicit, always visible handle.
+    component ChannelSlider: QQC2.Slider {
+        id: ch
+        property color startColor: "black"
+        property color endColor: "white"
+        Layout.fillWidth: true
+        from: 0; to: 255; stepSize: 1
+        implicitHeight: 24
+
+        background: Rectangle {
+            x: ch.leftPadding
+            y: ch.topPadding + ch.availableHeight / 2 - height / 2
+            width: ch.availableWidth
+            height: 8
+            radius: 4
+            gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: ch.startColor }
+                GradientStop { position: 1.0; color: ch.endColor }
+            }
+            border.color: Qt.rgba(0.5, 0.5, 0.5, 0.5)
+            border.width: 1
+        }
+
+        handle: Rectangle {
+            x: ch.leftPadding + ch.visualPosition * (ch.availableWidth - width)
+            y: ch.topPadding + ch.availableHeight / 2 - height / 2
+            width: 18
+            height: 18
+            radius: 9
+            color: ch.pressed ? Kirigami.Theme.highlightColor : "#ffffff"
+            border.color: ch.activeFocus || ch.hovered ? Kirigami.Theme.highlightColor : "#333333"
+            border.width: 2
+        }
+    }
+
     RowLayout {
         Layout.fillWidth: true
         spacing: Kirigami.Units.smallSpacing
@@ -99,21 +135,12 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label { text: "R"; color: "#e05555"; font.bold: true; Layout.preferredWidth: 14 }
-            QQC2.Slider {
+            ChannelSlider {
                 id: sliderR
-                Layout.fillWidth: true
-                from: 0; to: 255; stepSize: 1
+                startColor: Qt.rgba(0, root._g / 255, root._b / 255, 1)
+                endColor:   Qt.rgba(1, root._g / 255, root._b / 255, 1)
                 onMoved: { root._r = Math.round(value); root._applyRgb() }
                 Binding { target: sliderR; property: "value"; value: root._r }
-                background: Rectangle {
-                    x: sliderR.leftPadding; y: sliderR.topPadding + sliderR.availableHeight / 2 - height / 2
-                    width: sliderR.availableWidth; height: 6; radius: 3
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: Qt.rgba(0, root._g/255, root._b/255, 1) }
-                        GradientStop { position: 1.0; color: Qt.rgba(1, root._g/255, root._b/255, 1) }
-                    }
-                }
             }
             QQC2.Label { text: root._r; Layout.preferredWidth: 28; horizontalAlignment: Text.AlignRight }
         }
@@ -122,21 +149,12 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label { text: "G"; color: "#55b855"; font.bold: true; Layout.preferredWidth: 14 }
-            QQC2.Slider {
+            ChannelSlider {
                 id: sliderG
-                Layout.fillWidth: true
-                from: 0; to: 255; stepSize: 1
+                startColor: Qt.rgba(root._r / 255, 0, root._b / 255, 1)
+                endColor:   Qt.rgba(root._r / 255, 1, root._b / 255, 1)
                 onMoved: { root._g = Math.round(value); root._applyRgb() }
                 Binding { target: sliderG; property: "value"; value: root._g }
-                background: Rectangle {
-                    x: sliderG.leftPadding; y: sliderG.topPadding + sliderG.availableHeight / 2 - height / 2
-                    width: sliderG.availableWidth; height: 6; radius: 3
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: Qt.rgba(root._r/255, 0, root._b/255, 1) }
-                        GradientStop { position: 1.0; color: Qt.rgba(root._r/255, 1, root._b/255, 1) }
-                    }
-                }
             }
             QQC2.Label { text: root._g; Layout.preferredWidth: 28; horizontalAlignment: Text.AlignRight }
         }
@@ -145,21 +163,12 @@ ColumnLayout {
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
             QQC2.Label { text: "B"; color: "#5588e0"; font.bold: true; Layout.preferredWidth: 14 }
-            QQC2.Slider {
+            ChannelSlider {
                 id: sliderB
-                Layout.fillWidth: true
-                from: 0; to: 255; stepSize: 1
+                startColor: Qt.rgba(root._r / 255, root._g / 255, 0, 1)
+                endColor:   Qt.rgba(root._r / 255, root._g / 255, 1, 1)
                 onMoved: { root._b = Math.round(value); root._applyRgb() }
                 Binding { target: sliderB; property: "value"; value: root._b }
-                background: Rectangle {
-                    x: sliderB.leftPadding; y: sliderB.topPadding + sliderB.availableHeight / 2 - height / 2
-                    width: sliderB.availableWidth; height: 6; radius: 3
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: Qt.rgba(root._r/255, root._g/255, 0, 1) }
-                        GradientStop { position: 1.0; color: Qt.rgba(root._r/255, root._g/255, 1, 1) }
-                    }
-                }
             }
             QQC2.Label { text: root._b; Layout.preferredWidth: 28; horizontalAlignment: Text.AlignRight }
         }
