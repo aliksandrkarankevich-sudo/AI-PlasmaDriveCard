@@ -161,15 +161,20 @@ PlasmoidItem {
        walk(blocks, "", "")
        return info
    }
+   // Все USB-устройства (флешки, USB-HDD/SSD, картридеры, приводы)
+   // попадают в одну общую группу "usb".
    function groupOf(info, name) {
        var e = info[name]
        var guard = 0
        while (e && guard++ < 16) {
            var t = e.node.type || ""
-           if (t === "disk")
-               return { key: "disk:" + e.node.name, raid: false, entry: e }
+           if (t === "disk" || t === "rom") {
+               if ((e.node.tran || "").toLowerCase() === "usb")
+                   return { key: "usb", raid: false, usb: true, entry: e }
+               return { key: "disk:" + e.node.name, raid: false, usb: false, entry: e }
+           }
            if (t.indexOf("raid") === 0 || t === "md")
-               return { key: "raid:" + e.node.name, raid: true, entry: e }
+               return { key: "raid:" + e.node.name, raid: true, usb: false, entry: e }
            e = info[e.parent]
        }
        return null
@@ -190,7 +195,10 @@ PlasmoidItem {
    }
    function makeGroup(g) {
        if (!g) return { key: "other", kind: "hdd", title: tr2("Прочее", "Other"),
-                        sub: "", rows: [], hasRoot: false }
+                        sub: "", rows: [], hasRoot: false, devs: ({}) }
+       if (g.usb)
+           return { key: "usb", kind: "usb", title: "USB",
+                    sub: "", rows: [], hasRoot: false, devs: ({}) }
        var n = g.entry.node
        if (g.raid) {
            var t = n.type || ""
@@ -199,13 +207,13 @@ PlasmoidItem {
            return { key: g.key, kind: "raid",
                     title: level + "  " + n.name,
                     sub: formatBytes(n.size) + (members ? "  •  " + members : ""),
-                    rows: [], hasRoot: false }
+                    rows: [], hasRoot: false, devs: ({}) }
        }
        var model = (n.model || "").replace(/\s+/g, " ").trim()
        return { key: g.key, kind: diskKind(n),
                 title: model || n.name,
                 sub: formatBytes(n.size) + "  •  " + diskTypeLabel(n) + "  •  " + n.name,
-                rows: [], hasRoot: false }
+                rows: [], hasRoot: false, devs: ({}) }
    }
    function blankRow() {
        return { title: "", target: "", source: "", fs: "", physical: "",
@@ -287,6 +295,13 @@ PlasmoidItem {
            var row = blankRow()
            row.title = label; row.target = target; row.source = source
            row.fs = prettyFs(fs.fstype); row.physical = grp.title
+           if (found && found.usb) {
+               var dn = found.entry.node
+               var dmodel = (dn.model || "").replace(/\s+/g, " ").trim() || dn.name
+               grp.devs[dn.name] = true
+               row.physical = dmodel
+               row.fs = row.fs + "  •  " + dmodel
+           }
            row.total = size; row.available = available; row.used = used
            row.kind = grp.kind
            row.driveIcon = displayIcon(target, grp.kind)
@@ -302,6 +317,8 @@ PlasmoidItem {
            if (a.hasRoot !== b.hasRoot) return a.hasRoot ? -1 : 1
            if (a.key === "other") return 1
            if (b.key === "other") return -1
+           if (a.key === "usb") return 1
+           if (b.key === "usb") return -1
            return a.title.localeCompare(b.title)
        })
 
@@ -309,6 +326,8 @@ PlasmoidItem {
        var rowsTotal = 0
        for (var gi = 0; gi < list.length; ++gi) {
            var g = list[gi]
+           if (g.key === "usb")
+               g.sub = tr2("Устройств: ", "Devices: ") + Object.keys(g.devs).length
            g.rows.sort(function(a, b) {
                if (a.target === "/") return -1
                if (b.target === "/") return  1
