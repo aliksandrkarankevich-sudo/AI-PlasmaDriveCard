@@ -48,6 +48,7 @@ PlasmoidItem {
    })
 
    property bool scanRunning:     false
+   property bool scanFailed:      false
    property bool activityRunning: false
    property bool pendingRefresh:  false
    property var  previousIo:      ({})
@@ -57,10 +58,13 @@ PlasmoidItem {
    function fontPx(base) {
        return Math.max(8, Math.round(base * Plasmoid.configuration.textScale / 100.0))
    }
+   function encodePath(path) {
+       return (path || "").split("/").map(encodeURIComponent).join("/")
+   }
    function openTarget(target) {
        if (!target) return
        var url = target.endsWith("/") ? target : target + "/"
-       Qt.openUrlExternally("file://" + encodeURI(url))
+       Qt.openUrlExternally("file://" + encodePath(url))
    }
    function diskIcon(kind) {
        if (kind === "raid") return "drive-multidisk"
@@ -76,14 +80,14 @@ PlasmoidItem {
        if (st === "computer")         return "computer"
        if (st === "custom") {
            var p = Plasmoid.configuration.customIconPath
-           if (p) return p.indexOf("/") === 0 ? "file://" + p : p
+           if (p) return p.indexOf("/") === 0 ? "file://" + encodePath(p) : p
        }
        if (target === "/" && kind !== "raid") return "drive-harddisk-root"
        return diskIcon(kind)
    }
    function basename(path) {
        var p = (path || "").replace(/\/$/, "")
-       return decodeURIComponent(p.substring(p.lastIndexOf("/") + 1)) || p
+       return p.substring(p.lastIndexOf("/") + 1) || p
    }
    function cleanSource(source) { return (source || "").replace(/\[.*\]$/, "") }
    function prettyFs(value) {
@@ -179,18 +183,45 @@ PlasmoidItem {
                 active: false, isHeader: false, groupSub: "", kind: "" }
    }
 
+   readonly property var syncKeys: ["title", "target", "source", "fs", "physical",
+       "total", "available", "used", "driveIcon", "kname", "groupSub", "kind"]
+
+   function syncModel(items) {
+       var same = drives.count === items.length
+       for (var q = 0; same && q < items.length; ++q) {
+           var o = drives.get(q), w = items[q]
+           if (o.isHeader !== w.isHeader || o.source !== w.source || o.target !== w.target)
+               same = false
+       }
+       if (same) {
+           for (var i = 0; i < items.length; ++i) {
+               var cur = drives.get(i), nw = items[i]
+               for (var k = 0; k < syncKeys.length; ++k) {
+                   var key = syncKeys[k]
+                   if (cur[key] !== nw[key]) drives.setProperty(i, key, nw[key])
+               }
+           }
+       } else {
+           drives.clear()
+           previousIo = ({})
+           for (var j = 0; j < items.length; ++j) drives.append(items[j])
+       }
+   }
+
    function rebuild(output) {
        var marker      = "__DC_LSBLK__"
        var markerIndex = output.indexOf(marker)
-       if (markerIndex < 0) return
+       if (markerIndex < 0) { scanFailed = true; return }
        var findmntData, lsblkData
        try {
            findmntData = JSON.parse(output.substring(0, markerIndex).trim())
            lsblkData   = JSON.parse(output.substring(markerIndex + marker.length).trim())
        } catch (error) {
            console.warn("DriveCard JSON:", error)
+           scanFailed = true
            return
        }
+       scanFailed = false
        var info   = buildInfo(lsblkData.blockdevices || [])
        var all    = []
        var groups = ({})
@@ -201,6 +232,7 @@ PlasmoidItem {
            var target = fs.target || ""
            var source = cleanSource(fs.source)
            if (!target || source.indexOf("/dev/") !== 0) continue
+           if (source.indexOf("/dev/loop") === 0) continue
            if (!Plasmoid.configuration.showRoot && target === "/") continue
            if (!Plasmoid.configuration.showBoot &&
                (target === "/boot" || target === "/boot/efi")) continue
@@ -212,19 +244,21 @@ PlasmoidItem {
            if (target === "/") label = tr2("Система", "System")
            else if (!label)    label = basename(target)
 
-           var found = groupOf(info, source.substring(source.lastIndexOf("/") + 1))
+           var devName = source.substring(source.lastIndexOf("/") + 1)
+           var found = groupOf(info, devName)
            var gkey  = found ? found.key : "other"
            if (!groups[gkey]) groups[gkey] = makeGroup(found)
            var grp = groups[gkey]
            if (target === "/") grp.hasRoot = true
 
+           var ent = info[devName]
            var row = blankRow()
            row.title = label; row.target = target; row.source = source
            row.fs = prettyFs(fs.fstype); row.physical = grp.title
            row.total = size; row.available = available; row.used = used
            row.kind = grp.kind
            row.driveIcon = displayIcon(target, grp.kind)
-           row.kname = basename(source)
+           row.kname = (ent && ent.node.kname) ? ent.node.kname : devName
            grp.rows.push(row)
            seen[source] = true
        }
@@ -238,8 +272,7 @@ PlasmoidItem {
            return a.title.localeCompare(b.title)
        })
 
-       drives.clear()
-       previousIo = ({})
+       var items = []
        var rowsTotal = 0
        for (var gi = 0; gi < list.length; ++gi) {
            var g = list[gi]
@@ -252,10 +285,11 @@ PlasmoidItem {
            head.isHeader = true
            head.title = g.title; head.groupSub = g.sub
            head.kind = g.kind; head.driveIcon = diskIcon(g.kind)
-           drives.append(head)
-           for (var k = 0; k < g.rows.length; ++k) drives.append(g.rows[k])
+           items.push(head)
+           for (var k = 0; k < g.rows.length; ++k) items.push(g.rows[k])
            rowsTotal += g.rows.length
        }
+       syncModel(items)
        rowCount   = rowsTotal
        groupCount = list.length
        _lastScanMs = Date.now()
@@ -264,6 +298,7 @@ PlasmoidItem {
        if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
        if (scanRunning) { pendingRefresh = true; return }
        scanRunning = true
+       scanWatchdog.restart()
        executable.connectSource(scanCommand)
    }
    function refreshActivity() {
@@ -304,7 +339,7 @@ PlasmoidItem {
    readonly property string scanScript:
        "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
        + "printf '\\n__DC_LSBLK__\\n'; "
-       + "LC_ALL=C lsblk --json --bytes -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL,SIZE,ROTA"
+       + "LC_ALL=C lsblk --json --bytes -o NAME,KNAME,PATH,PKNAME,TYPE,TRAN,MODEL,SIZE,ROTA"
    readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
@@ -321,9 +356,11 @@ PlasmoidItem {
        onNewData: function(sourceName, data) {
            if (sourceName === root.scanCommand) {
                disconnectSource(sourceName)
+               scanWatchdog.stop()
                root.scanRunning = false
                var output = data["stdout"] || ""
                if (output.length) root.rebuild(output)
+               else root.scanFailed = true
                if (root.pendingRefresh) {
                    root.pendingRefresh = false
                    root.refresh(0)
@@ -336,6 +373,18 @@ PlasmoidItem {
        }
    }
 
+   Timer {
+       id: scanWatchdog
+       interval: 20000
+       repeat: false
+       onTriggered: {
+           if (root.scanRunning) {
+               executable.disconnectSource(root.scanCommand)
+               root.scanRunning = false
+               root.scanFailed = true
+           }
+       }
+   }
    Timer {
        id: delayedRefresh
        interval: 400
@@ -355,15 +404,15 @@ PlasmoidItem {
        triggeredOnStart: true
        onTriggered: root.refreshActivity()
    }
-   // Детектор подключения/отключения устройств (в т.ч. сборка RAID):
-   // опрашивает /proc/partitions и пересканирует диски при изменении.
+   // Детектор подключения/отключения устройств, монтирования и сборки RAID:
+   // опрашивает /proc/partitions и /proc/self/mountinfo, пересканирует при изменении.
    Timer {
        id: hotplugPoller
        interval: 5000
        repeat:   true
        running:  true
        property int _lastCount: -1
-       onTriggered: hotplugExec.connectSource("cat /proc/partitions")
+       onTriggered: hotplugExec.connectSource("cat /proc/partitions /proc/self/mountinfo")
    }
    Plasma5Support.DataSource {
        id: hotplugExec
@@ -429,34 +478,6 @@ PlasmoidItem {
            curve:        Plasmoid.configuration.edgeCurve / 100.0
            radius:       Plasmoid.configuration.rounded
                              ? Plasmoid.configuration.cornerRadius : 0
-       }
-
-       Rectangle {
-           id: suspendedOverlay
-           anchors.fill: parent
-           visible: false
-           color:   Qt.rgba(0, 0, 0, 0.55)
-           radius:  Plasmoid.configuration.rounded
-                        ? Plasmoid.configuration.cornerRadius : 0
-           z: 99
-           Column {
-               anchors.centerIn: parent
-               spacing: Kirigami.Units.smallSpacing
-               Kirigami.Icon {
-                   source: "dialog-warning"
-                   width:  Kirigami.Units.iconSizes.large
-                   height: Kirigami.Units.iconSizes.large
-                   anchors.horizontalCenter: parent.horizontalCenter
-               }
-               PC3.Label {
-                   text: root.tr2(
-                       "Виджет приостановлен\nПовтор через 30 с",
-                       "Widget suspended\nRetrying in 30 s")
-                   color: "white"
-                   horizontalAlignment: Text.AlignHCenter
-                   font.pixelSize: root.fontPx(14)
-               }
-           }
        }
 
        ColumnLayout {
@@ -722,7 +743,9 @@ PlasmoidItem {
                    visible: drives.count === 0
                    text: root.scanRunning
                        ? root.tr2("Обновление...", "Refreshing...")
-                       : root.tr2("Доступные диски не найдены", "No accessible drives found")
+                       : root.scanFailed
+                           ? root.tr2("Не удалось прочитать список дисков", "Failed to read the drive list")
+                           : root.tr2("Доступные диски не найдены", "No accessible drives found")
                    color: view.labelColor
                    opacity: 0.75
                    font.pixelSize: root.fontPx(15)

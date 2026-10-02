@@ -18,7 +18,6 @@ KCM.SimpleKCM {
     property bool   cfg_showRoot
     property bool   cfg_showBoot
     property bool   cfg_showFs
-    property bool   cfg_showPhysical
     property string cfg_iconStyle
     property string cfg_customIconPath
     property bool   cfg_showActivity
@@ -51,7 +50,6 @@ KCM.SimpleKCM {
     property bool   cfg_showRootDefault:            true
     property bool   cfg_showBootDefault:            false
     property bool   cfg_showFsDefault:              true
-    property bool   cfg_showPhysicalDefault:        true
     property string cfg_iconStyleDefault:           "drive"
     property string cfg_customIconPathDefault:      ""
     property bool   cfg_showActivityDefault:        true
@@ -77,16 +75,6 @@ KCM.SimpleKCM {
     readonly property bool ru: cfg_language !== "en"
     function tr2(r, e) { return ru ? r : e }
 
-    readonly property int _smallSp: 4
-    function _fontPx(base) { return Math.max(8, Math.round(base * cfg_textScale / 100.0)) }
-    readonly property int _rowPadV: Math.max(4, cfg_rowPaddingV)
-    readonly property int _rowGapV: _smallSp
-    readonly property int _effectiveRowH:
-        _rowPadV * 2
-        + _fontPx(18) + _fontPx(16) + _fontPx(13)
-        + _fontPx(13) + Math.max(2, cfg_progressHeight)
-        + _rowGapV * 4
-
     readonly property var _iconStyles: [
         { id: "drive",            ru: "Авто (по типу диска)", en: "Auto (by drive type)" },
         { id: "folder",           ru: "Папка",                en: "Folder" },
@@ -106,7 +94,7 @@ KCM.SimpleKCM {
     readonly property var _factory: ({
         autoFit: true, rowPaddingV: 4, separatorHeight: 1,
         textScale: 95, progressHeight: 9, maxHeight: 720,
-        showRoot: true, showBoot: false, showFs: true, showPhysical: true,
+        showRoot: true, showBoot: false, showFs: true,
         iconStyle: "drive", customIconPath: "", showActivity: true, activityInterval: 2,
         backgroundOpacity: 60, backgroundColorMode: "theme", backgroundColor: "#20242b",
         textOpacity: 90, textColorMode: "theme", textColor: "#eff0f1",
@@ -136,7 +124,7 @@ KCM.SimpleKCM {
             rowPaddingV: cfg_rowPaddingV, separatorHeight: cfg_separatorHeight,
             textScale: cfg_textScale, progressHeight: cfg_progressHeight,
             maxHeight: cfg_maxHeight, showRoot: cfg_showRoot, showBoot: cfg_showBoot,
-            showFs: cfg_showFs, showPhysical: cfg_showPhysical, iconStyle: cfg_iconStyle,
+            showFs: cfg_showFs, iconStyle: cfg_iconStyle,
             customIconPath: cfg_customIconPath,
             showActivity: cfg_showActivity, activityInterval: cfg_activityInterval,
             backgroundOpacity: cfg_backgroundOpacity,
@@ -178,7 +166,6 @@ KCM.SimpleKCM {
         cfg_showRoot            = p.showRoot            !== undefined ? p.showRoot            : cfg_showRootDefault
         cfg_showBoot            = p.showBoot            !== undefined ? p.showBoot            : cfg_showBootDefault
         cfg_showFs              = p.showFs              !== undefined ? p.showFs              : cfg_showFsDefault
-        cfg_showPhysical        = p.showPhysical        !== undefined ? p.showPhysical        : cfg_showPhysicalDefault
         cfg_iconStyle           = p.iconStyle           !== undefined ? p.iconStyle           : cfg_iconStyleDefault
         cfg_customIconPath      = p.customIconPath      !== undefined ? p.customIconPath      : cfg_customIconPathDefault
         cfg_showActivity        = p.showActivity        !== undefined ? p.showActivity        : cfg_showActivityDefault
@@ -242,7 +229,6 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: page.tr2("Сохранённые:", "Saved:")
             Layout.fillWidth: true
             implicitHeight: Math.min(profileModel.count * 40, 200)
-            visible: profileModel.count > 0
             model: profileModel
             clip: true
             delegate: RowLayout {
@@ -304,11 +290,6 @@ KCM.SimpleKCM {
             text: page.tr2("Подбирать автоматически", "Fit automatically")
             checked: page.cfg_autoFit
             onToggled: page.cfg_autoFit = checked
-        }
-        QQC2.Label {
-            Kirigami.FormData.label: page.tr2("Высота строки:", "Row height:")
-            text: page._effectiveRowH + " px  " + page.tr2("(авто)", "(auto)")
-            opacity: 0.65
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Отступ строки:", "Row padding:")
