@@ -21,6 +21,9 @@ PlasmoidItem {
    readonly property int  headerH: Kirigami.Units.gridUnit * 2
    readonly property int  rowGapV: Kirigami.Units.smallSpacing
    readonly property int  progressH: Math.max(2, Plasmoid.configuration.progressHeight)
+   readonly property int  groupH:
+       Math.max(Kirigami.Units.iconSizes.smallMedium,
+                Math.ceil(fontPx(15) * 1.4)) + rowGapV * 2
    readonly property int estimatedRowH:
        rowPadV * 2
        + fontPx(18) + fontPx(16) + fontPx(13)
@@ -30,43 +33,24 @@ PlasmoidItem {
    readonly property int effectiveRowH: measuredRowH > 0 ? measuredRowH : estimatedRowH
    property int measuredHeaderH: 0
    readonly property int effectiveHeaderH: Math.max(headerH, measuredHeaderH)
+   property int rowCount:   0
+   property int groupCount: 0
    readonly property int wantedHeight: Math.max(minH,
        Math.min(maxH,
            pad * 2 + effectiveHeaderH + rowGapV
-           + Math.max(1, drives.count) * effectiveRowH
+           + Math.max(1, rowCount) * effectiveRowH
+           + groupCount * groupH
            + Math.max(0, drives.count - 1) * sepH))
 
-   function logFitState(reason) {
-       console.warn("[DriveCard FIT]",
-           "event=", reason,
-           "autoFit=", Plasmoid.configuration.autoFit,
-           "textScale=", Plasmoid.configuration.textScale,
-           "count=", drives.count,
-           "rowH=", effectiveRowH,
-           "wantedH=", wantedHeight,
-           "actualH=", root.height,
-           "minH=", minH,
-           "maxH=", maxH,
-           "layoutMin=", root.Layout.minimumHeight,
-           "layoutPref=", root.Layout.preferredHeight,
-           "layoutMax=", root.Layout.maximumHeight)
-   }
-
    onWantedHeightChanged: Qt.callLater(function() {
-       if (Plasmoid.configuration.autoFit && root.wantedHeight > 0) {
+       if (Plasmoid.configuration.autoFit && root.wantedHeight > 0)
            root.height = root.wantedHeight
-       }
-       root.logFitState("wantedHeight changed")
-   })
-   onHeightChanged: Qt.callLater(function() {
-       root.logFitState("actual height changed")
    })
 
    property bool scanRunning:     false
    property bool activityRunning: false
    property bool pendingRefresh:  false
    property var  previousIo:      ({})
-   // последний момент сканирования — для fallback-детектора устройств
    property real _lastScanMs:     0
 
    function tr2(r, e) { return ru ? r : e }
@@ -78,11 +62,24 @@ PlasmoidItem {
        var url = target.endsWith("/") ? target : target + "/"
        Qt.openUrlExternally("file://" + encodeURI(url))
    }
-   function displayIcon(target, physical) {
-       if (Plasmoid.configuration.iconStyle === "folder")      return "folder"
-       if (Plasmoid.configuration.iconStyle === "folder-open") return "folder-open"
-       return target === "/" ? "drive-harddisk-root"
-           : (physical.indexOf("USB ") === 0 ? "drive-removable-media-usb" : "drive-harddisk")
+   function diskIcon(kind) {
+       if (kind === "raid") return "drive-multidisk"
+       if (kind === "usb")  return "drive-removable-media-usb"
+       if (kind === "ssd")  return "drive-harddisk-solidstate"
+       return "drive-harddisk"
+   }
+   function displayIcon(target, kind) {
+       var st = Plasmoid.configuration.iconStyle
+       if (st === "folder")           return "folder"
+       if (st === "folder-open")      return "folder-open"
+       if (st === "folder-documents") return "folder-documents"
+       if (st === "computer")         return "computer"
+       if (st === "custom") {
+           var p = Plasmoid.configuration.customIconPath
+           if (p) return p.indexOf("/") === 0 ? "file://" + p : p
+       }
+       if (target === "/" && kind !== "raid") return "drive-harddisk-root"
+       return diskIcon(kind)
    }
    function basename(path) {
        var p = (path || "").replace(/\/$/, "")
@@ -105,27 +102,83 @@ PlasmoidItem {
        while (n >= 1024 && i < units.length - 1) { n /= 1024; ++i }
        return Qt.locale(ru ? "ru_RU" : "en_US").toString(n, "f", i < 3 ? 0 : 1) + " " + units[i]
    }
-   function shortDrive(source, map) {
-       var key  = cleanSource(source)
-       var node = map[key] || map[basename(key)]
-       var guard = 0
-       while (node && node.type !== "disk" && node.pkname && guard++ < 12)
-           node = map[node.pkname] || map["/dev/" + node.pkname]
-       if (!node) return ""
-       var name  = node.name || basename(node.path || "")
-       var tran  = (node.tran || "").toLowerCase()
-       var match = /^nvme(\d+)n\d+$/.exec(name)
-       if (match)                                        return "NVMe " + match[1]
-       if (tran === "usb")                               return "USB " + name
-       if (tran === "sata" || /^sd[a-z]+$/.test(name))  return "SATA " + name
-       return tran ? tran.toUpperCase() + " " + name : tr2("Диск ", "Disk ") + name
-   }
    function flatten(items, output) {
        for (var i = 0; i < (items || []).length; ++i) {
            output.push(items[i])
            if (items[i].children) flatten(items[i].children, output)
        }
    }
+
+   // ---- физические диски и RAID ----------------------------------------
+   function isRota(v) { return v === true || v === 1 || v === "1" || v === "true" }
+
+   function buildInfo(blocks) {
+       var info = ({})
+       function walk(list, diskName, parentName) {
+           for (var i = 0; i < (list || []).length; ++i) {
+               var n = list[i]
+               var e = info[n.name]
+               if (!e) { e = { node: n, disks: [], parent: parentName }; info[n.name] = e }
+               var d = (n.type === "disk") ? n.name : diskName
+               if (d && e.disks.indexOf(d) < 0) e.disks.push(d)
+               walk(n.children, d, n.name)
+           }
+       }
+       walk(blocks, "", "")
+       return info
+   }
+   function groupOf(info, name) {
+       var e = info[name]
+       var guard = 0
+       while (e && guard++ < 16) {
+           var t = e.node.type || ""
+           if (t === "disk")
+               return { key: "disk:" + e.node.name, raid: false, entry: e }
+           if (t.indexOf("raid") === 0 || t === "md")
+               return { key: "raid:" + e.node.name, raid: true, entry: e }
+           e = info[e.parent]
+       }
+       return null
+   }
+   function diskKind(n) {
+       var tran = (n.tran || "").toLowerCase()
+       if (tran === "usb")  return "usb"
+       if (tran === "nvme" || !isRota(n.rota)) return "ssd"
+       return "hdd"
+   }
+   function diskTypeLabel(n) {
+       var tran = (n.tran || "").toLowerCase()
+       if (tran === "nvme") return "NVMe"
+       if (tran === "usb")  return "USB"
+       if (!tran && /^(vd|xvd)/.test(n.name || ""))
+           return tr2("Виртуальный", "Virtual")
+       return isRota(n.rota) ? "HDD" : "SSD"
+   }
+   function makeGroup(g) {
+       var n = g.entry.node
+       if (!g) return { key: "other", kind: "hdd", title: tr2("Прочее", "Other"),
+                        sub: "", rows: [], hasRoot: false }
+       if (g.raid) {
+           var t = n.type || ""
+           var level = t.indexOf("raid") === 0 ? "RAID " + t.substring(4) : "RAID"
+           var members = g.entry.disks.join(" + ")
+           return { key: g.key, kind: "raid",
+                    title: level + "  " + n.name,
+                    sub: formatBytes(n.size) + (members ? "  •  " + members : ""),
+                    rows: [], hasRoot: false }
+       }
+       var model = (n.model || "").replace(/\s+/g, " ").trim()
+       return { key: g.key, kind: diskKind(n),
+                title: model || n.name,
+                sub: formatBytes(n.size) + "  •  " + diskTypeLabel(n) + "  •  " + n.name,
+                rows: [], hasRoot: false }
+   }
+   function blankRow() {
+       return { title: "", target: "", source: "", fs: "", physical: "",
+                total: 0, available: 0, used: 0, driveIcon: "", kname: "",
+                active: false, isHeader: false, groupSub: "", kind: "" }
+   }
+
    function rebuild(output) {
        var marker      = "__DC_LSBLK__"
        var markerIndex = output.indexOf(marker)
@@ -138,18 +191,10 @@ PlasmoidItem {
            console.warn("DriveCard JSON:", error)
            return
        }
-       var map    = ({})
-       var blocks = lsblkData.blockdevices || []
-       for (var i = 0; i < blocks.length; ++i) {
-           var block = blocks[i]
-           map[block.name]                  = block
-           if (block.path) map[block.path]  = block
-           map["/dev/" + block.name]        = block
-           map["/dev/mapper/" + block.name] = block
-       }
-       var all  = []
-       var rows = []
-       var seen = ({})
+       var info   = buildInfo(lsblkData.blockdevices || [])
+       var all    = []
+       var groups = ({})
+       var seen   = ({})
        flatten(findmntData.filesystems || [], all)
        for (var j = 0; j < all.length; ++j) {
            var fs     = all[j]
@@ -166,24 +211,53 @@ PlasmoidItem {
            var label     = fs.label || ""
            if (target === "/") label = tr2("Система", "System")
            else if (!label)    label = basename(target)
-           var physical = shortDrive(source, map)
-           rows.push({
-               title: label, target: target, source: source,
-               fs: prettyFs(fs.fstype), physical: physical,
-               total: size, available: available, used: used,
-               driveIcon: displayIcon(target, physical),
-               kname: basename(source), active: false
-           })
+
+           var found = groupOf(info, source.substring(source.lastIndexOf("/") + 1))
+           var gkey  = found ? found.key : "other"
+           if (!groups[gkey]) groups[gkey] = makeGroup(found)
+           var grp = groups[gkey]
+           if (target === "/") grp.hasRoot = true
+
+           var row = blankRow()
+           row.title = label; row.target = target; row.source = source
+           row.fs = prettyFs(fs.fstype); row.physical = grp.title
+           row.total = size; row.available = available; row.used = used
+           row.kind = grp.kind
+           row.driveIcon = displayIcon(target, grp.kind)
+           row.kname = basename(source)
+           grp.rows.push(row)
            seen[source] = true
        }
-       rows.sort(function(a, b) {
-           if (a.target === "/") return -1
-           if (b.target === "/") return  1
+
+       var list = []
+       for (var key in groups) list.push(groups[key])
+       list.sort(function(a, b) {
+           if (a.hasRoot !== b.hasRoot) return a.hasRoot ? -1 : 1
+           if (a.key === "other") return 1
+           if (b.key === "other") return -1
            return a.title.localeCompare(b.title)
        })
+
        drives.clear()
        previousIo = ({})
-       for (var k = 0; k < rows.length; ++k) drives.append(rows[k])
+       var rowsTotal = 0
+       for (var gi = 0; gi < list.length; ++gi) {
+           var g = list[gi]
+           g.rows.sort(function(a, b) {
+               if (a.target === "/") return -1
+               if (b.target === "/") return  1
+               return a.title.localeCompare(b.title)
+           })
+           var head = blankRow()
+           head.isHeader = true
+           head.title = g.title; head.groupSub = g.sub
+           head.kind = g.kind; head.driveIcon = diskIcon(g.kind)
+           drives.append(head)
+           for (var k = 0; k < g.rows.length; ++k) drives.append(g.rows[k])
+           rowsTotal += g.rows.length
+       }
+       rowCount   = rowsTotal
+       groupCount = list.length
        _lastScanMs = Date.now()
    }
    function refresh(delay) {
@@ -206,7 +280,8 @@ PlasmoidItem {
                current[parts[2]] = String(parts[3]) + ":" + String(parts[7])
        }
        for (var j = 0; j < drives.count; ++j) {
-           var row    = drives.get(j)
+           var row = drives.get(j)
+           if (row.isHeader) continue
            var now    = current[row.kname]
            var before = previousIo[row.kname]
            drives.setProperty(j, "active",
@@ -217,7 +292,8 @@ PlasmoidItem {
    function refreshIcons() {
        for (var i = 0; i < drives.count; ++i) {
            var row = drives.get(i)
-           drives.setProperty(i, "driveIcon", displayIcon(row.target, row.physical))
+           if (row.isHeader) continue
+           drives.setProperty(i, "driveIcon", displayIcon(row.target, row.kind))
        }
    }
    function scheduleStorageRefresh() {
@@ -228,7 +304,7 @@ PlasmoidItem {
    readonly property string scanScript:
        "LC_ALL=C findmnt --json --real --bytes -o SOURCE,TARGET,FSTYPE,LABEL,SIZE,AVAIL,USE%; "
        + "printf '\\n__DC_LSBLK__\\n'; "
-       + "LC_ALL=C lsblk --json --bytes -l -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL"
+       + "LC_ALL=C lsblk --json --bytes -o NAME,PATH,PKNAME,TYPE,TRAN,MODEL,SIZE,ROTA"
    readonly property string activityCommand: "/bin/cat /proc/diskstats"
 
    Layout.minimumWidth:    Kirigami.Units.gridUnit * 22
@@ -279,9 +355,8 @@ PlasmoidItem {
        triggeredOnStart: true
        onTriggered: root.refreshActivity()
    }
-   // Fallback-детектор устройств: опрашивает /proc/partitions каждые 5 с,
-   // при изменении числа строк инициирует пересканирование дисков.
-   // Заменяет Solid.DeviceNotifier без зависимости от org.kde.solid.
+   // Детектор подключения/отключения устройств (в т.ч. сборка RAID):
+   // опрашивает /proc/partitions и пересканирует диски при изменении.
    Timer {
        id: hotplugPoller
        interval: 5000
@@ -309,6 +384,8 @@ PlasmoidItem {
        function onShowRootChanged()        { root.refresh(0) }
        function onShowBootChanged()        { root.refresh(0) }
        function onIconStyleChanged()       { root.refreshIcons() }
+       function onCustomIconPathChanged()  { root.refreshIcons() }
+       function onLanguageChanged()        { root.scheduleStorageRefresh() }
        function onTextScaleChanged()       { root.scheduleStorageRefresh() }
        function onRowPaddingVChanged()     { root.scheduleStorageRefresh() }
        function onSeparatorHeightChanged() { root.scheduleStorageRefresh() }
@@ -414,7 +491,7 @@ PlasmoidItem {
                    Layout.fillWidth: true
                }
                PC3.Label {
-                   text:           drives.count
+                   text:           root.rowCount
                    color:          view.labelColor
                    opacity:        0.72
                    font.pixelSize: root.fontPx(13)
@@ -448,42 +525,32 @@ PlasmoidItem {
                    required property string driveIcon
                    required property string kname
                    required property bool   active
+                   required property bool   isHeader
+                   required property string groupSub
+                   required property string kind
                    required property int    index
 
-                   function logRowGeometry() {
-                       if (row.implicitHeight > 0) {
+                   function measureRow() {
+                       if (!isHeader && row.implicitHeight > 0)
                            root.measuredRowH = Math.ceil(row.implicitHeight)
-                       }
-                       console.warn("[DriveCard ROW]",
-                           "index=", index,
-                           "scale=", Plasmoid.configuration.textScale,
-                           "allocated=", height,
-                           "rowActual=", row.height,
-                           "rowImplicit=", row.implicitHeight,
-                           "rowMinimum=", row.Layout.minimumHeight,
-                           "listH=", list.height,
-                           "contentH=", list.contentHeight,
-                           "headerH=", header.height,
-                           "headerImplicit=", header.implicitHeight,
-                           "headerEstimate=", root.headerH,
-                           "viewH=", view.height)
                    }
 
-                   Component.onCompleted: Qt.callLater(logRowGeometry)
+                   Component.onCompleted: Qt.callLater(measureRow)
 
                    Connections {
                        target: row
                        function onImplicitHeightChanged() {
-                           Qt.callLater(logRowGeometry)
+                           Qt.callLater(measureRow)
                        }
                    }
 
                    width:          list.width
-                   implicitHeight: Math.ceil(row.implicitHeight)
+                   implicitHeight: isHeader ? root.groupH : Math.ceil(row.implicitHeight)
                    height:         implicitHeight
 
                    Rectangle {
                        anchors.fill: parent
+                       visible: !isHeader
                        color: hoverArea.containsMouse
                            ? Qt.rgba(
                                Kirigami.Theme.highlightColor.r,
@@ -495,23 +562,59 @@ PlasmoidItem {
                        Behavior on color { ColorAnimation { duration: 120 } }
                    }
 
-                   QQC2.ToolTip.visible: hoverArea.containsMouse
-                   QQC2.ToolTip.text:   source + "\n" + target
+                   QQC2.ToolTip.visible: hoverArea.containsMouse && !isHeader
+                   QQC2.ToolTip.text:   source + "\n" + target + "\n" + physical
                    QQC2.ToolTip.delay:  600
 
                    MouseArea {
                        id: hoverArea
                        anchors.fill: parent
+                       enabled: !isHeader
                        hoverEnabled: true
                        onClicked: root.openTarget(target)
                    }
 
                    RowLayout {
-                       id: row
+                       id: groupRow
                        anchors.fill: parent
                        anchors.leftMargin: Kirigami.Units.smallSpacing
                        anchors.rightMargin: Kirigami.Units.largeSpacing
+                       spacing: Kirigami.Units.smallSpacing
+                       visible: isHeader
+
+                       Kirigami.Icon {
+                           source: driveIcon
+                           Layout.preferredWidth:  Kirigami.Units.iconSizes.smallMedium
+                           Layout.preferredHeight: Kirigami.Units.iconSizes.smallMedium
+                           Layout.alignment: Qt.AlignVCenter
+                       }
+                       PC3.Label {
+                           text:             title
+                           color:            view.labelColor
+                           font.bold:        true
+                           font.pixelSize:   root.fontPx(15)
+                           elide:            Text.ElideRight
+                           Layout.fillWidth: true
+                           Layout.alignment: Qt.AlignVCenter
+                       }
+                       PC3.Label {
+                           text:             groupSub
+                           color:            view.labelColor
+                           opacity:          0.72
+                           font.pixelSize:   root.fontPx(12)
+                           elide:            Text.ElideRight
+                           Layout.maximumWidth: list.width * 0.6
+                           Layout.alignment: Qt.AlignVCenter
+                       }
+                   }
+
+                   RowLayout {
+                       id: row
+                       anchors.fill: parent
+                       anchors.leftMargin: Kirigami.Units.smallSpacing + Kirigami.Units.largeSpacing
+                       anchors.rightMargin: Kirigami.Units.largeSpacing
                        spacing: Kirigami.Units.largeSpacing
+                       visible: !isHeader
 
                        Item {
                            Layout.preferredWidth:  Kirigami.Units.iconSizes.medium
@@ -557,12 +660,7 @@ PlasmoidItem {
                            }
                            PC3.Label {
                                visible: Plasmoid.configuration.showFs
-                                     || Plasmoid.configuration.showPhysical
-                               text: {
-                                   var a = Plasmoid.configuration.showFs       ? fs       : ""
-                                   var b = Plasmoid.configuration.showPhysical ? physical : ""
-                                   return (a && b) ? (a + "  •  " + b) : (a + b)
-                               }
+                               text:    fs
                                color:            view.labelColor
                                opacity:          0.72
                                font.pixelSize:   root.fontPx(13)
