@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Build the .plasmoid archive, generate SHA256SUMS, then install or upgrade.
+# Build the .plasmoid archive, generate SHA256SUMS, then install or upgrade
+# (install step is skipped when kpackagetool6 is not available, e.g. in CI).
 # Usage: bash scripts/build.sh
 set -euo pipefail
 
@@ -33,7 +34,12 @@ PY
 
 echo "Built: ${out}"
 
-# Install or upgrade
+# Install or upgrade (only where kpackagetool6 exists)
+if ! command -v kpackagetool6 >/dev/null 2>&1; then
+    echo "kpackagetool6 not found: skipping install step"
+    exit 0
+fi
+
 if kpackagetool6 --type=Plasma/Applet --list 2>/dev/null | grep -qF "${plugin_id}"; then
     kpackagetool6 --type=Plasma/Applet --upgrade "${out}"
 else
