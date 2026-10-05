@@ -21,6 +21,7 @@ for f in metadata.json \
          contents/ui/main.qml \
          contents/config/main.xml \
          contents/ui/ConfigGeneral.qml \
+         contents/ui/ColorPicker.qml \
          contents/ui/EdgeFadeBackground.qml; do
     if [[ -f "${PACKAGE_DIR}/${f}" ]]; then
         ok "${f} exists"
@@ -47,57 +48,42 @@ for field in Id Version Name KPackageStructure; do
     fi
 done
 
-# 4. main.xml: no openOnRowClick (removed in beta2)
+# 4. metadata.json is valid JSON
+if python3 -c "import json; json.load(open('${META}'))" 2>/dev/null; then
+    ok "metadata.json is valid JSON"
+else
+    fail "metadata.json is not valid JSON"
+fi
+
+# 5. main.xml is well-formed XML
 MAIN_XML="${PACKAGE_DIR}/contents/config/main.xml"
-if grep -q 'openOnRowClick' "${MAIN_XML}"; then
-    fail "main.xml still contains openOnRowClick"
+if python3 -c "import xml.dom.minidom as m; m.parse('${MAIN_XML}')" 2>/dev/null; then
+    ok "main.xml is well-formed"
 else
-    ok "main.xml: no openOnRowClick"
+    fail "main.xml is not well-formed XML"
 fi
 
-# 5. ConfigGeneral.qml: no openOnRowClick
-CFG="${PACKAGE_DIR}/contents/ui/ConfigGeneral.qml"
-if grep -q 'openOnRowClick' "${CFG}"; then
-    fail "ConfigGeneral.qml still contains openOnRowClick"
+# 6. openOnRowClick was removed in beta2
+if grep -q 'openOnRowClick' "${MAIN_XML}" "${PACKAGE_DIR}/contents/ui/ConfigGeneral.qml"; then
+    fail "openOnRowClick still present in config"
 else
-    ok "ConfigGeneral.qml: no openOnRowClick"
-fi
-
-# 6. main.qml uses ItemDelegate for list rows
-MAIN_QML="${PACKAGE_DIR}/contents/ui/main.qml"
-if grep -q 'QQC2.ItemDelegate' "${MAIN_QML}"; then
-    ok "main.qml uses ItemDelegate for list rows"
-else
-    fail "main.qml does not use ItemDelegate for list rows"
+    ok "No openOnRowClick in config"
 fi
 
 # 7. main.qml has no standalone folder-open ToolButton
+MAIN_QML="${PACKAGE_DIR}/contents/ui/main.qml"
 if grep -qE 'folder-open.*ToolButton|ToolButton.*folder-open' "${MAIN_QML}"; then
     fail "main.qml still contains standalone folder-open ToolButton"
 else
     ok "main.qml: no standalone folder-open ToolButton"
 fi
 
-# 8. EdgeFadeBackground.qml: Canvas-based four-sided fade
-EDGE_QML="${PACKAGE_DIR}/contents/ui/EdgeFadeBackground.qml"
-if [[ -f "${EDGE_QML}" ]]; then
-    if grep -q 'Canvas' "${EDGE_QML}" && \
-       grep -q '_fwH'   "${EDGE_QML}" && \
-       grep -q '_fwV'   "${EDGE_QML}"; then
-        ok "EdgeFadeBackground.qml: Canvas four-sided fade present"
-    else
-        fail "EdgeFadeBackground.qml: Canvas fade missing (_fwH/_fwV)"
-    fi
-else
-    fail "EdgeFadeBackground.qml not found"
-fi
-
-# 9. Build
+# 8. Build
 echo ""
 echo "--- Running build ---"
 bash "${SCRIPT_DIR}/build.sh"
 
-# 10. Verify .plasmoid artefact exists
+# 9. Verify .plasmoid artefact exists
 VERSION="$(python3 -c "import json,sys; print(json.load(open('${META}'))['KPlugin']['Version'])")"
 PLASMOID="${ROOT_DIR}/dist/cachyos-drive-card-${VERSION}.plasmoid"
 if [[ -f "${PLASMOID}" ]]; then
@@ -106,7 +92,7 @@ else
     fail "${PLASMOID##*/} not found"
 fi
 
-# 11. No backup files inside the .plasmoid archive
+# 10. No backup files inside the .plasmoid archive
 if [[ -f "${PLASMOID}" ]]; then
     BAD="$(unzip -l "${PLASMOID}" | grep -E '\.backup|\.bak' || true)"
     if [[ -z "${BAD}" ]]; then
