@@ -17,17 +17,24 @@ for cmd in curl sha256sum kpackagetool6; do
 done
 
 # ── Find release ─────────────────────────────────────────────────────
-if [[ "$PRERELEASE" == "--prerelease" ]]; then
-    echo "Looking for latest release (including pre-releases)…"
-    RELEASE_JSON=$(curl -fsSL "${API}/releases" | python3 -c "
+latest_any_release() {
+    curl -fsSL "${API}/releases" | python3 -c "
 import json, sys
 releases = json.load(sys.stdin)
 if not releases: raise SystemExit('No releases found')
 print(json.dumps(releases[0]))
-")
+"
+}
+
+if [[ "$PRERELEASE" == "--prerelease" ]]; then
+    echo "Looking for latest release (including pre-releases)…"
+    RELEASE_JSON=$(latest_any_release)
 else
     echo "Looking for latest stable release…"
-    RELEASE_JSON=$(curl -fsSL "${API}/releases/latest")
+    if ! RELEASE_JSON=$(curl -fsSL "${API}/releases/latest" 2>/dev/null); then
+        echo "No stable release found, using the latest pre-release…"
+        RELEASE_JSON=$(latest_any_release)
+    fi
 fi
 
 VERSION=$(echo "$RELEASE_JSON" | python3 -c "import json,sys; print(json.load(sys.stdin)['tag_name'])")
@@ -87,4 +94,5 @@ fi
 
 echo ""
 echo "Drive Cards $VERSION installed successfully."
-echo "Restart Plasma to use the widget:  plasmashell --replace &"
+echo "Restart Plasma to use the widget:  systemctl --user restart plasma-plasmashell.service"
+echo "(or: kquitapp6 plasmashell && kstart plasmashell)"
