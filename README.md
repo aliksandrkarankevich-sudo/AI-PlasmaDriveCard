@@ -1,7 +1,7 @@
 # Drive Cards
 
 ![Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)
-![Version](https://img.shields.io/badge/version-0.95.0--beta2-orange)
+![Version](https://img.shields.io/badge/version-0.96.0--beta3-orange)
 ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-green)
 
 Небольшой полупрозрачный виджет дисков для KDE Plasma 6 и CachyOS. Показывает смонтированные локальные разделы, свободное место, файловую систему и краткое имя физического накопителя.
@@ -16,7 +16,7 @@ English: a compact configurable drive-card widget for KDE Plasma 6.
 - Значки диска, папки и открытой папки.
 - Масштаб текста и толщина индикатора заполнения.
 - Цвета и прозрачность фона и текста.
-- Настраиваемые скругления и **четырёхсторонный переход в прозрачность** по краям.
+- Настраиваемые скругления и **четырёхсторонний переход в прозрачность** по краям.
 - Индикатор операций чтения/записи.
 - Автообновление после подключения и отключения накопителя.
 
@@ -24,14 +24,22 @@ English: a compact configurable drive-card widget for KDE Plasma 6.
 
 ### Способ 1 — Автоматически из GitHub Releases (рекомендуется)
 
-Скачивает последний выпуск, проверяет контрольную сумму и устанавливает:
+Скачивает последний выпуск, проверяет контрольную сумму и устанавливает. Если стабильных релизов нет, скрипт автоматически берёт последний pre-release:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh -o install-from-github.sh
 bash install-from-github.sh
 ```
 
+Чтобы явно выбрать последний выпуск, включая beta-версии, запустите с флагом:
+
+```bash
+bash install-from-github.sh --prerelease
+```
+
 > Рекомендуется сначала просмотреть скрипт: `less install-from-github.sh`
+
+После установки или обновления [перезапустите Plasma](#перезапуск-plasma).
 
 ### Способ 2 — Вручную из Releases
 
@@ -55,14 +63,21 @@ cd AI-PlasmaDriveCard
 ./scripts/install.sh
 ```
 
-Для beta-ветки:
+## Перезапуск Plasma
+
+Чтобы новая версия виджета подхватилась, перезапустите plasmashell:
 
 ```bash
-git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
-  https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
-cd AI-PlasmaDriveCard
-./scripts/install.sh
+systemctl --user restart plasma-plasmashell.service
 ```
+
+Если служба недоступна (plasmashell запущен не через systemd), используйте:
+
+```bash
+kquitapp6 plasmashell && kstart plasmashell
+```
+
+В fish вместо `&&` можно использовать `; and`. Команда `plasmashell --replace &` тоже работает, но запускает plasmashell в текущем терминале и выводит в него журнал всех виджетов и обоев.
 
 ## Удаление
 
@@ -95,7 +110,7 @@ journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
 
 ## Статус
 
-0.95.0-beta2 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
+0.96.0-beta3 — тестовая версия (pre-release). Стабильных выпусков пока нет. Перед обновлением сохраните настройки установленной версии.
 
 ## Лицензия
 
