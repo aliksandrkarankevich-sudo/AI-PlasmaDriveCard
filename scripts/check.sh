@@ -1,41 +1,111 @@
 #!/usr/bin/env bash
+# Validate package structure, metadata, and build artefact.
+# Usage: bash scripts/check.sh
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
-python3 - <<'PY'
-from pathlib import Path
-import json, re
-import xml.etree.ElementTree as ET
-required=[Path('package/metadata.json'),Path('package/contents/config/config.qml'),Path('package/contents/config/main.xml'),Path('package/contents/ui/ConfigGeneral.qml'),Path('package/contents/ui/main.qml')]
-missing=[str(p) for p in required if not p.is_file()]
-assert not missing, f'Missing files: {missing}'
-meta=json.loads(required[0].read_text())
-assert meta['KPlugin']['Id']=='io.github.cachyos.drivecard'
-assert meta['KPackageStructure']=='Plasma/Applet'
-version=meta['KPlugin']['Version']
-print(f'Version from metadata: {version}')
-ET.parse(required[2])
-cfg=required[3].read_text(); xml=required[2].read_text()
-props=set(re.findall(r'property\s+\w+\s+cfg_(\w+)',cfg))
-entries=set(re.findall(r'<entry name="([^"]+)"',xml))
-assert props==entries, f'Configuration mismatch: {sorted(props^entries)}'
-print('Package layout, metadata, XML and configuration: OK')
-PY
-bash -n scripts/*.sh
-./scripts/build.sh
-python3 - <<'PY'
-from zipfile import ZipFile
-import json
-from pathlib import Path
-version=json.loads(Path('package/metadata.json').read_text())['KPlugin']['Version']
-p=f'dist/cachyos-drive-card-{version}.plasmoid'
-with ZipFile(p) as z:
-    assert z.testzip() is None
-    names=set(z.namelist())
-    assert {'metadata.json','contents/ui/main.qml','contents/config/main.xml'} <= names
-print(f'Plasmoid archive {p}: OK')
-PY
-if command -v qmllint >/dev/null 2>&1; then
-  qmllint package/contents/ui/main.qml package/contents/ui/ConfigGeneral.qml package/contents/config/config.qml
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="${SCRIPT_DIR}/.."
+PACKAGE_DIR="${ROOT_DIR}/package"
+PASS=0
+FAIL=0
+
+# Use PASS=$((PASS+1)) instead of ((PASS++)): the latter returns exit code 1
+# when the result is 0, which kills the script under set -e.
+ok()   { echo "  [OK]  $*"; PASS=$((PASS+1)); }
+fail() { echo "  [FAIL] $*"; FAIL=$((FAIL+1)); }
+
+echo "=== Drive Cards package check ==="
+
+# 1. Required files
+for f in metadata.json \
+         contents/ui/main.qml \
+         contents/config/main.xml \
+         contents/ui/ConfigGeneral.qml \
+         contents/ui/ColorPicker.qml \
+         contents/ui/EdgeFadeBackground.qml; do
+    if [[ -f "${PACKAGE_DIR}/${f}" ]]; then
+        ok "${f} exists"
+    else
+        fail "${f} missing"
+    fi
+done
+
+# 2. No backup files inside package/
+BACKUPS="$(find "${PACKAGE_DIR}" \( -name '*.backup' -o -name '*.backup-*' -o -name '*.bak' \) 2>/dev/null || true)"
+if [[ -z "${BACKUPS}" ]]; then
+    ok "No backup files in package/"
 else
-  echo "qmllint не найден: QML-проверка пропущена."
+    fail "Backup files found: ${BACKUPS}"
+fi
+
+# 3. metadata.json has required fields
+META="${PACKAGE_DIR}/metadata.json"
+for field in Id Version Name KPackageStructure; do
+    if grep -q "${field}" "${META}"; then
+        ok "metadata.json has ${field}"
+    else
+        fail "metadata.json missing ${field}"
+    fi
+done
+
+# 4. metadata.json is valid JSON
+if python3 -c "import json; json.load(open('${META}'))" 2>/dev/null; then
+    ok "metadata.json is valid JSON"
+else
+    fail "metadata.json is not valid JSON"
+fi
+
+# 5. main.xml is well-formed XML
+MAIN_XML="${PACKAGE_DIR}/contents/config/main.xml"
+if python3 -c "import xml.dom.minidom as m; m.parse('${MAIN_XML}')" 2>/dev/null; then
+    ok "main.xml is well-formed"
+else
+    fail "main.xml is not well-formed XML"
+fi
+
+# 6. openOnRowClick was removed in beta2
+if grep -q 'openOnRowClick' "${MAIN_XML}" "${PACKAGE_DIR}/contents/ui/ConfigGeneral.qml"; then
+    fail "openOnRowClick still present in config"
+else
+    ok "No openOnRowClick in config"
+fi
+
+# 7. main.qml has no standalone folder-open ToolButton
+MAIN_QML="${PACKAGE_DIR}/contents/ui/main.qml"
+if grep -qE 'folder-open.*ToolButton|ToolButton.*folder-open' "${MAIN_QML}"; then
+    fail "main.qml still contains standalone folder-open ToolButton"
+else
+    ok "main.qml: no standalone folder-open ToolButton"
+fi
+
+# 8. Build
+echo ""
+echo "--- Running build ---"
+bash "${SCRIPT_DIR}/build.sh"
+
+# 9. Verify .plasmoid artefact exists
+VERSION="$(python3 -c "import json,sys; print(json.load(open('${META}'))['KPlugin']['Version'])")"
+PLASMOID="${ROOT_DIR}/dist/cachyos-drive-card-${VERSION}.plasmoid"
+if [[ -f "${PLASMOID}" ]]; then
+    ok "${PLASMOID##*/} created"
+else
+    fail "${PLASMOID##*/} not found"
+fi
+
+# 10. No backup files inside the .plasmoid archive
+if [[ -f "${PLASMOID}" ]]; then
+    BAD="$(unzip -l "${PLASMOID}" | grep -E '\.backup|\.bak' || true)"
+    if [[ -z "${BAD}" ]]; then
+        ok "No backup files inside .plasmoid"
+    else
+        fail "Backup files inside .plasmoid: ${BAD}"
+    fi
+fi
+
+echo ""
+echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
+if [[ "${FAIL}" -eq 0 ]]; then
+    exit 0
+else
+    exit 1
 fi

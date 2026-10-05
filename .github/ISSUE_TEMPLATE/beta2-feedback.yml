@@ -1,0 +1,85 @@
+name: "Отзыв о beta2 (замечания и идеи)"
+description: Замечания по работе, визуальные несоответствия и идеи для v0.95.0-beta2
+labels: [beta2, feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за тестирование **v0.95.0-beta2**!
+        Опишите, что заметили. Это может быть баг, неудобство, визуальный артефакт или идея.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Тип отзыва
+      options:
+        - Ошибка / краш
+        - Визуальный артефакт
+        - Неудобное поведение
+        - Идея / предложение
+        - Вопрос
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Описание
+      description: Что произошло или что хотелось бы улучшить?
+      placeholder: "Например: при прозрачности 40% центр фона выглядит темнее, чем ожидается"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения (для ошибок)
+      description: Как воспроизвести проблему? Пропустите, если отзыв — идея.
+      placeholder: |
+        1. Открыть настройки виджета
+        2. Уменьшить Edge Width до 10
+        3. ...
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемое поведение
+      placeholder: Переход должен быть плавным от краёв к центру
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактическое поведение
+      placeholder: Центр тоже частично прозрачный
+
+  - type: input
+    id: plasma_version
+    attributes:
+      label: Версия KDE Plasma
+      placeholder: "6.1.x"
+
+  - type: input
+    id: os
+    attributes:
+      label: ОС / дистрибутив
+      placeholder: CachyOS, Arch Linux, ...
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Журнал (при необходимости)
+      description: |
+        Если есть ошибки в журнале:
+        `journalctl --user -b | grep -Ei 'plasmashell|drivecard|qml' | tail -30`
+        Удалите домашние пути, имена пользователя и UUID.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Подтверждение
+      options:
+        - label: Я тестировал именно v0.95.0-beta2.
+          required: true
+        - label: Персональные данные из журнала удалены.
+          required: true

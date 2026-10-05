@@ -1,23 +1,26 @@
 name: Check
 on:
   push:
-    branches: [main]
+    branches: [main, 'fix/**', 'feat/**']
   pull_request:
     branches: [main]
-permissions:
-  contents: read
 jobs:
   package:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - name: Install zip support
-        run: sudo apt-get update && sudo apt-get install -y zip
+      - uses: actions/checkout@v4
+      - name: Make scripts executable
+        run: chmod +x scripts/*.sh
       - name: Check and build
-        run: ./scripts/check.sh
-      - uses: actions/upload-artifact@v7
+        run: bash scripts/check.sh
+      - name: Get version
+        id: version
+        run: |
+          VER=$(python3 -c "import json; print(json.load(open('package/metadata.json'))['KPlugin']['Version'])")
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
         with:
-          name: drive-cards-0.95b1
+          name: drive-cards-${{ steps.version.outputs.ver }}
           path: |
             dist/*.plasmoid
             dist/SHA256SUMS

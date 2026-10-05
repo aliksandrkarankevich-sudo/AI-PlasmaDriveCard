@@ -2,21 +2,37 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g. v0.95.0-beta2)'
+        required: true
 permissions:
   contents: write
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v4
       - name: Install zip support
-        run: sudo apt-get update && sudo apt-get install -y zip
+        run: sudo apt-get update && sudo apt-get install -y zip python3
       - name: Check and build
         run: ./scripts/check.sh
-      - name: Publish prerelease
-        uses: softprops/action-gh-release@v3
+      - name: Read version from metadata
+        id: meta
+        run: |
+          VER=$(python3 -c "import json; print(json.load(open('package/metadata.json'))['KPlugin']['Version'])")
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          if echo "$VER" | grep -qiE 'alpha|beta|rc'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
         with:
-          prerelease: true
+          name: Drive Cards ${{ steps.meta.outputs.version }}
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           generate_release_notes: true
           files: |
             dist/*.plasmoid

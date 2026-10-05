@@ -16,9 +16,9 @@ English: a compact configurable drive-card widget for KDE Plasma 6.
 - Значки диска, папки и открытой папки.
 - Масштаб текста и толщина индикатора заполнения.
 - Цвета и прозрачность фона и текста.
-- Настраиваемые скругления и прозрачные края (2-D Canvas маска — углы без удвоения альфа).
+- Настраиваемые скругления и **четырёхсторонный переход в прозрачность** по краям.
 - Индикатор операций чтения/записи.
-- Автообновление после подключения и отключения накопителя (~1 с).
+- Автообновление после подключения и отключения накопителя.
 
 ## Установка
 
@@ -45,45 +45,29 @@ kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
 
 При обновлении замените `--install` на `--upgrade`.
 
-Либо откройте файл через Plasma: правая кнопка на рабочем столе → **Добавить виджеты** → **Установить виджет из локального файла**.
+Либо откройте через Plasma: правая кнопка на рабочем столе → **Добавить виджеты** → **Установить виджет из локального файла**.
 
-### Способ 3 — Через Git (стабильная ветка main)
-
-Клонирует репозиторий и запускает скрипт установки:
+### Способ 3 — Из исходников (для разработки и тестирования)
 
 ```bash
 git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-bash scripts/install.sh
+./scripts/install.sh
 ```
 
-### Способ 4 — Через Git (бета-ветка)
-
-Для тестирования последних изменений до официального релиза:
+Для beta-ветки:
 
 ```bash
 git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
   https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-bash scripts/install.sh
-```
-
-> ⚠️ Бета-ветка может содержать нестабильный код. Перед установкой сохраните текущую версию.
-
-#### Обновление через Git
-
-Если виджет уже установлен из Git, для обновления до последнего коммита:
-
-```bash
-cd AI-PlasmaDriveCard
-git pull
-bash scripts/install.sh
+./scripts/install.sh
 ```
 
 ## Удаление
 
 ```bash
-bash scripts/uninstall.sh
+./scripts/uninstall.sh
 ```
 
 Либо вручную:
@@ -95,8 +79,8 @@ kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 ## Сборка и проверка
 
 ```bash
-bash scripts/check.sh
-bash scripts/build.sh
+./scripts/check.sh
+./scripts/build.sh
 ```
 
 Готовый пакет появится в `dist/`.
@@ -109,13 +93,9 @@ bash scripts/build.sh
 journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
 ```
 
-## 💡 Предложения и идеи
-
-Есть идея по улучшению? Откройте [Issue с шаблоном Feature Request](https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/issues/new?template=feature_request.yml) — опишите что хотите и зачем.
-
 ## Статус
 
-**0.95.0-beta2** — актуальная тестовая версия. Включает исправление прозрачности углов (2-D Canvas маска), ускоренный hotplug (~1 с) и кликабельные строки дисков. Перед обновлением сохраните установленную версию.
+0.95.0-beta2 — тестовая версия. Перед обновлением сохраните установленную 0.8.1.
 
 ## Лицензия
 
