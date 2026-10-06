@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v0.95.0-beta2)'
+        description: 'Tag to release (e.g. v0.96.0-beta3)'
         required: true
 permissions:
   contents: write
@@ -17,7 +17,7 @@ jobs:
       - name: Install zip support
         run: sudo apt-get update && sudo apt-get install -y zip python3
       - name: Check and build
-        run: ./scripts/check.sh
+        run: bash scripts/check.sh
       - name: Read version from metadata
         id: meta
         run: |
