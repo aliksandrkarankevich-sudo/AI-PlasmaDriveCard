@@ -2,7 +2,7 @@
 
 Format: newest first. Details are reconstructed from the commit history of each branch.
 
-## v0.96-beta3 (branch `dev/v0.96-beta3`)
+## v0.96.0-beta3 (release tag `v0.96.0-beta3`, pre-release; development branch `dev/v0.96-beta3`)
 
 UI and settings
 - Settings page rebuilt on `KCM.SimpleKCM`; RGB `ColorPicker` with preview and visible slider handles.
@@ -16,6 +16,11 @@ Fixes
 - `ColorPicker` signals renamed (`modeSelected`, `colorPicked`) to avoid clash with property change signals.
 - `org.kde.solid` dependency removed (polling instead of DeviceNotifier).
 - Audit fixes: scan watchdog and error state, mountinfo hotplug, loop devices skipped, `makeGroup` null crash.
+
+Repository and tooling
+- `install-from-github.sh` finds the latest release or pre-release without the `--prerelease` flag.
+- Authors recorded: developer aliksandrkarankevich-sudo, co-author Perplexity AI.
+- Documentation refreshed (TESTING, INSTALL, ROADMAP, CONTRIBUTING); generic `feedback.yml` issue template.
 
 ## v0.96-beta2 (branch `dev/v0.96-beta2`, tip b749d96)
 
