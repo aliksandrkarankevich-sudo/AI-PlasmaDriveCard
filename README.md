@@ -13,9 +13,11 @@ English: a compact configurable drive-card widget for KDE Plasma 6.
 - Русский и английский интерфейс.
 - Автоматическая высота при изменении числа разделов.
 - Открытие раздела нажатием по всей строке.
-- Значки диска, папки и открытой папки.
+- Значки диска, папки и открытой папки; отдельный значок и его размер для каждого тома.
 - Масштаб текста и толщина индикатора заполнения.
-- Цвета и прозрачность фона и текста.
+- Цвета и прозрачность фона и текста, RGB ColorPicker с предварительным просмотром.
+- Профили настроек: сохранение, загрузка и удаление пользовательских наборов.
+- Группировка разделов под физическими дисками и RAID; единый раздел USB.
 - Настраиваемые скругления и **четырёхсторонний переход в прозрачность** по краям.
 - Индикатор операций чтения/записи.
 - Автообновление после подключения и отключения накопителя.
@@ -60,7 +62,7 @@ kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
 ```bash
 git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-./scripts/install.sh
+bash scripts/install.sh
 ```
 
 ## Перезапуск Plasma
@@ -81,21 +83,19 @@ kquitapp6 plasmashell && kstart plasmashell
 
 ## Удаление
 
-```bash
-./scripts/uninstall.sh
-```
-
-Либо вручную:
+Вручную:
 
 ```bash
 kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 ```
 
+Из клонированного репозитория также можно выполнить `bash scripts/uninstall.sh`.
+
 ## Сборка и проверка
 
 ```bash
-./scripts/check.sh
-./scripts/build.sh
+bash scripts/check.sh
+bash scripts/build.sh
 ```
 
 Готовый пакет появится в `dist/`.
@@ -105,7 +105,7 @@ kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 Используйте форму **Bug report** в Issues. Приложите версию Plasma, способ установки, шаги воспроизведения, снимок экрана и вывод:
 
 ```bash
-journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
+journalctl --user -b | grep -Ei "drivecard|qml"
 ```
 
 ## Статус
@@ -115,7 +115,7 @@ journalctl --user -b | grep -Ei "drivecard|qml|plasmoid"
 ## Авторы
 
 - **Разработчик:** [aliksandrkarankevich-sudo](https://github.com/aliksandrkarankevich-sudo).
-- **Соавтор:** Perplexity AI — ИИ-ассистент, помогавший с кодом, скриптами установки, релизами и документации.
+- **Соавтор:** Perplexity AI — ИИ-ассистент, помогавший с кодом, скриптами установки, релизами и документацией.
 
 Проект разрабатывается с участием ИИ. Все изменения проверяет и публикует разработчик.
 

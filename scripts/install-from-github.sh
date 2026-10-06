@@ -8,10 +8,11 @@ API="https://api.github.com/repos/${REPO}"
 PRERELEASE="${1:-}"
 
 # ── Dependency checks ────────────────────────────────────────────────
-for cmd in curl sha256sum kpackagetool6; do
+for cmd in curl sha256sum kpackagetool6 python3; do
     if ! command -v "$cmd" &>/dev/null; then
         echo "Error: '$cmd' not found." >&2
         [ "$cmd" = "kpackagetool6" ] && echo "Install plasma-framework or kde-cli-tools." >&2
+        [ "$cmd" = "python3" ] && echo "Install python." >&2
         exit 1
     fi
 done

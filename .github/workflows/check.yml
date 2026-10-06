@@ -1,7 +1,7 @@
 name: Check
 on:
   push:
-    branches: [main, 'fix/**', 'feat/**']
+    branches: [main, 'fix/**', 'feat/**', 'feature/**']
   pull_request:
     branches: [main]
 jobs:

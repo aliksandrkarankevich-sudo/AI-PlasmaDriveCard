@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release (e.g. v0.96.0-beta3)'
+        description: 'Tag to release (e.g. v0.96.0-beta4)'
         required: true
 permissions:
   contents: write
@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
       - name: Install zip support
         run: sudo apt-get update && sudo apt-get install -y zip python3
       - name: Check and build
@@ -31,6 +33,7 @@ jobs:
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           name: Drive Cards ${{ steps.meta.outputs.version }}
           prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           generate_release_notes: true
