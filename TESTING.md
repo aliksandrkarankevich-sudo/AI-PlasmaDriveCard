@@ -1,27 +1,37 @@
-# Тестирование v0.95.0-beta2
+# Тестирование v0.96.0-beta3
 
-> Это руководство для вечерней проверки beta2.  
-> Замечания и идеи оставляйте через **[Issues → Отзыв о beta2](../../issues/new?template=beta2-feedback.yml)**.
+> Руководство для проверки тестовой версии (pre-release).  
+> Ошибки оставляйте через **[Issues → Bug report](../../issues/new?template=bug.yml)**, идеи — через **[Feature request](../../issues/new?template=feature.yml)**.
 
 ## Быстрая установка
 
-### Вариант А — из ветки (рекомендуется для beta2)
+### Вариант А — из GitHub Releases (рекомендуется)
 
 ```bash
-git clone --branch fix/v0.95.0-beta2-edge-fade --single-branch \
-  https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+curl -fsSL https://raw.githubusercontent.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard/main/scripts/install-from-github.sh -o install-from-github.sh
+bash install-from-github.sh
+```
+
+Если стабильных релизов нет, скрипт сам возьмёт последний pre-release. Для явного выбора добавьте `--prerelease`.
+
+### Вариант Б — из исходников (собрать вручную)
+
+```bash
+git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-bash scripts/install.sh
+bash scripts/build.sh
+kpackagetool6 --type Plasma/Applet --install dist/cachyos-drive-card-0.96.0-beta3.plasmoid
 ```
 
-### Вариант Б — собрать вручную
+При обновлении с предыдущей версии замените `--install` на `--upgrade`.
+
+### Перезапуск Plasma
 
 ```bash
-bash scripts/build.sh
-kpackagetool6 --type Plasma/Applet --install dist/cachyos-drive-card-0.95.0-beta2.plasmoid
+systemctl --user restart plasma-plasmashell.service
 ```
 
-При обновлении с beta1 замените `--install` на `--upgrade`.
+Если служба недоступна: `kquitapp6 plasmashell && kstart plasmashell` (в fish: `kquitapp6 plasmashell; and kstart plasmashell`).
 
 ### Добавление виджета
 
@@ -57,7 +67,7 @@ kpackagetool6 --type Plasma/Applet --install dist/cachyos-drive-card-0.95.0-beta
 journalctl --user -b | grep -Ei 'plasmashell|drivecard|qml' | tail -50
 ```
 
-Перед публикацией удалите из вывода домашние пути, имена пользователя и UUID.
+Перед публикацией удалите из вывода домашние пути, имена пользователя и UUID. В журнале могут быть строки от других приложений и обоев — нужны только строки с `drivecard`.
 
 ## Удаление после тестирования
 
@@ -70,3 +80,7 @@ bash scripts/uninstall.sh
 ```bash
 kpackagetool6 --type Plasma/Applet --remove io.github.cachyos.drivecard
 ```
+
+## Авторы
+
+Разработчик: aliksandrkarankevich-sudo. Соавтор: Perplexity AI.
