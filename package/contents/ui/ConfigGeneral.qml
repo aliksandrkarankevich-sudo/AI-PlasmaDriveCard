@@ -425,7 +425,7 @@ KCM.SimpleKCM {
             onToggled: page.cfg_showFs = checked
         }
         QQC2.ComboBox {
-            Kirigami.FormData.label: page.tr2("Значок:", "Icon:")
+            Kirigami.FormData.label: page.tr2("Вид значка:", "Icon style:")
             model: page._iconStyles.map(function(s) { return page.ru ? s.ru : s.en })
             currentIndex: page._iconIndex()
             onActivated: {
@@ -434,8 +434,16 @@ KCM.SimpleKCM {
                 if (id === "custom" && !page.cfg_customIconPath) iconDialog.open()
             }
         }
+        QQC2.Label {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            opacity: 0.7
+            font: Kirigami.Theme.smallFont
+            text: page.tr2("Общий значок для всех дисков. Для отдельных томов его можно переопределить ниже.",
+                           "One icon for all drives. You can override it for individual volumes below.")
+        }
         RowLayout {
-            Kirigami.FormData.label: page.tr2("Свой значок:", "Custom icon:")
+            Kirigami.FormData.label: page.tr2("Своя картинка:", "Custom picture:")
             Layout.fillWidth: true
             visible: page.cfg_iconStyle === "custom"
             spacing: Kirigami.Units.smallSpacing
@@ -449,6 +457,15 @@ KCM.SimpleKCM {
                 text: page.tr2("Выбрать…", "Browse…")
                 onClicked: iconDialog.open()
             }
+        }
+        QQC2.Label {
+            Layout.fillWidth: true
+            visible: page.cfg_iconStyle === "custom"
+            wrapMode: Text.Wrap
+            opacity: 0.7
+            font: Kirigami.Theme.smallFont
+            text: page.tr2("Файл SVG, SVGZ или PNG, который будет показан у всех дисков.",
+                           "An SVG, SVGZ or PNG file shown next to all drives.")
         }
         QQC2.CheckBox {
             Kirigami.FormData.label: page.tr2("Активность:", "Activity:")
