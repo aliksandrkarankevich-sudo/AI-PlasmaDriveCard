@@ -78,6 +78,13 @@ KCM.SimpleKCM {
     readonly property bool ru: cfg_language !== "en"
     function tr2(r, e) { return ru ? r : e }
 
+    component Hint: QQC2.Label {
+        Layout.fillWidth: true
+        wrapMode: Text.Wrap
+        opacity: 0.7
+        font: Kirigami.Theme.smallFont
+    }
+
     readonly property var _iconStyles: [
         { id: "drive",            ru: "Авто (по типу диска)", en: "Auto (by drive type)" },
         { id: "folder",           ru: "Папка",                en: "Folder" },
@@ -349,6 +356,10 @@ KCM.SimpleKCM {
                 onClicked: page.saveProfile(profileNameField.text.trim())
             }
         }
+        Hint {
+            text: page.tr2("Профиль хранит все настройки. «По умолчанию» возвращает заводские значения.",
+                           "A profile stores all settings. “Default” restores factory values.")
+        }
 
         // ---- Language ----
         Kirigami.Separator { Kirigami.FormData.isSection: true }
@@ -368,12 +379,20 @@ KCM.SimpleKCM {
             checked: page.cfg_autoFit
             onToggled: page.cfg_autoFit = checked
         }
+        Hint {
+            text: page.tr2("Высота подстраивается под число дисков в пределах максимальной.",
+                           "Height follows the number of drives, up to the maximum.")
+        }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Отступ строки:", "Row padding:")
             from: 4; to: 40; stepSize: 2; value: page.cfg_rowPaddingV
             textFromValue: function(v) { return v + " px" }
             valueFromText: function(t) { return parseInt(t) || 4 }
             onValueModified: page.cfg_rowPaddingV = value
+        }
+        Hint {
+            text: page.tr2("Вертикальный отступ внутри строки диска.",
+                           "Vertical padding inside each drive row.")
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Отступ между дисками:", "Gap between drives:")
@@ -382,12 +401,20 @@ KCM.SimpleKCM {
             valueFromText: function(t) { return parseInt(t) || 0 }
             onValueModified: page.cfg_separatorHeight = value
         }
+        Hint {
+            text: page.tr2("Промежуток между строками дисков. 0 — выключен.",
+                           "Space between drive rows. 0 means off.")
+        }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Масштаб текста:", "Text scale:")
             from: 70; to: 160; stepSize: 5; value: page.cfg_textScale
             textFromValue: function(v) { return v + "%" }
             valueFromText: function(t) { return parseInt(t) || 95 }
             onValueModified: page.cfg_textScale = value
+        }
+        Hint {
+            text: page.tr2("Размер шрифта относительно системного.",
+                           "Font size relative to the system font.")
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Толщина полосы:", "Bar thickness:")
@@ -396,12 +423,20 @@ KCM.SimpleKCM {
             valueFromText: function(t) { return parseInt(t) || 9 }
             onValueModified: page.cfg_progressHeight = value
         }
+        Hint {
+            text: page.tr2("Толщина полосы заполнения диска.",
+                           "Thickness of the disk usage bar.")
+        }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Максимальная высота:", "Maximum height:")
             from: 240; to: 1600; stepSize: 20; value: page.cfg_maxHeight
             textFromValue: function(v) { return v + " px" }
             valueFromText: function(t) { return parseInt(t) || 720 }
             onValueModified: page.cfg_maxHeight = value
+        }
+        Hint {
+            text: page.tr2("Верхний предел высоты при автоматическом подборе.",
+                           "Upper height limit used by automatic fitting.")
         }
 
         // ---- Content ----
@@ -423,6 +458,10 @@ KCM.SimpleKCM {
             text: page.tr2("Показывать файловую систему", "Show filesystem")
             checked: page.cfg_showFs
             onToggled: page.cfg_showFs = checked
+        }
+        Hint {
+            text: page.tr2("Тип файловой системы, например btrfs или ext4, рядом с названием диска.",
+                           "Filesystem type, such as btrfs or ext4, next to the drive name.")
         }
         QQC2.ComboBox {
             Kirigami.FormData.label: page.tr2("Вид значка:", "Icon style:")
@@ -480,6 +519,10 @@ KCM.SimpleKCM {
             valueFromText: function(t) { return parseInt(t) || 2 }
             onValueModified: page.cfg_activityInterval = value
         }
+        Hint {
+            text: page.tr2("Как часто обновляется индикатор чтения и записи.",
+                           "How often the read/write indicator refreshes.")
+        }
 
         // ---- Volume icons ----
         Kirigami.Heading { Kirigami.FormData.isSection: true; level: 3; text: page.tr2("Значки томов", "Volume icons") }
@@ -493,6 +536,10 @@ KCM.SimpleKCM {
             editText: page.ovTarget
             onActivated: page.ovTarget = currentText
             onAccepted: page.ovTarget = editText.trim()
+        }
+        Hint {
+            text: page.tr2("Выберите том, чтобы задать ему свой значок и размер.",
+                           "Pick a volume to give it its own icon and size.")
         }
         RowLayout {
             Kirigami.FormData.label: page.tr2("Картинка:", "Picture:")
@@ -520,6 +567,10 @@ KCM.SimpleKCM {
             valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? 100 : n }
             onValueModified: page._ovSet(page.ovTarget, page._ovIcon(page.ovTarget), value)
         }
+        Hint {
+            text: page.tr2("100% — обычный размер значка.",
+                           "100% is the normal icon size.")
+        }
         QQC2.Button {
             text: page.tr2("Сбросить для этого тома", "Reset for this volume")
             enabled: page.ovTarget.length > 0
@@ -543,6 +594,10 @@ KCM.SimpleKCM {
             textFromValue: function(v) { return v + "%" }
             valueFromText: function(t) { var n = parseInt(t); return isNaN(n) ? value : n }
             onValueModified: page.cfg_backgroundOpacity = value
+        }
+        Hint {
+            text: page.tr2("0% — фон полностью прозрачный, 100% — сплошной.",
+                           "0% is fully transparent, 100% is solid.")
         }
 
         ColorPicker {
@@ -597,12 +652,20 @@ KCM.SimpleKCM {
             valueFromText: function(t) { return parseInt(t) || 0 }
             onValueModified: page.cfg_edgeOpacity = value
         }
+        Hint {
+            text: page.tr2("Насколько прозрачным становится фон у самого края виджета.",
+                           "How transparent the background becomes at the widget edge.")
+        }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Ширина перехода:", "Fade width:")
             from: 0; to: 96; value: page.cfg_edgeWidth
             textFromValue: function(v) { return v + " px" }
             valueFromText: function(t) { return parseInt(t) || 0 }
             onValueModified: page.cfg_edgeWidth = value
+        }
+        Hint {
+            text: page.tr2("Ширина зоны плавного перехода от края к основному фону.",
+                           "Width of the smooth transition from the edge to the main background.")
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Кривая перехода:", "Fade curve:")
@@ -611,12 +674,20 @@ KCM.SimpleKCM {
             valueFromText: function(t) { return parseInt(t) || 0 }
             onValueModified: page.cfg_edgeCurve = value
         }
+        Hint {
+            text: page.tr2("Форма перехода: 0 — ровный, значения выше и ниже нуля меняют его крутизну.",
+                           "Transition shape: 0 is even; positive and negative values change its steepness.")
+        }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Отступ содержимого:", "Content padding:")
             from: 8; to: 64; stepSize: 2; value: page.cfg_contentPadding
             textFromValue: function(v) { return v + " px" }
             valueFromText: function(t) { return parseInt(t) || 10 }
             onValueModified: page.cfg_contentPadding = value
+        }
+        Hint {
+            text: page.tr2("Отступ содержимого от краёв виджета.",
+                           "Distance between the content and the widget edges.")
         }
 
         // ---- Refresh ----
@@ -629,6 +700,10 @@ KCM.SimpleKCM {
             valueFromText: function(t) { return parseInt(t) || 60 }
             onValueModified: page.cfg_updateInterval = value
         }
+        Hint {
+            text: page.tr2("Как часто обновляются сведения о занятом месте.",
+                           "How often used-space data is refreshed.")
+        }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Предупреждение:", "Warning:")
             from: 50; to: page.cfg_criticalPercent - 1; value: page.cfg_warningPercent
@@ -636,12 +711,20 @@ KCM.SimpleKCM {
             valueFromText: function(t) { return parseInt(t) || 80 }
             onValueModified: page.cfg_warningPercent = value
         }
+        Hint {
+            text: page.tr2("Заполнение диска, с которого показывается предупреждение.",
+                           "Disk usage level at which the warning state starts.")
+        }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Критический уровень:", "Critical:")
             from: page.cfg_warningPercent + 1; to: 100; value: page.cfg_criticalPercent
             textFromValue: function(v) { return v + "%" }
             valueFromText: function(t) { return parseInt(t) || 90 }
             onValueModified: page.cfg_criticalPercent = value
+        }
+        Hint {
+            text: page.tr2("Заполнение диска, с которого показывается критическое состояние. Должно быть выше предупреждения.",
+                           "Disk usage level at which the critical state starts. Must be above the warning level.")
         }
     }
 }
