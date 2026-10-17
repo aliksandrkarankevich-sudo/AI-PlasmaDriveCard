@@ -134,6 +134,7 @@ KCM.SimpleKCM {
         if (!keys.length) return tr2("Переопределений нет", "No overrides")
         return keys.map(function(k) {
             var e = all[k]
+            if (!e || typeof e !== "object" || Array.isArray(e)) return k
             var parts = []
             if (e.icon) parts.push(tr2("значок", "icon"))
             if (e.size) parts.push(e.size + "%")
@@ -184,7 +185,15 @@ KCM.SimpleKCM {
     // ---- profiles ----
     function _loadProfiles() {
         if (!cfg_profiles || cfg_profiles.trim() === "") return []
-        try { return JSON.parse(cfg_profiles) } catch(e) { return [] }
+        try {
+            var profiles = JSON.parse(cfg_profiles)
+            if (!Array.isArray(profiles)) return []
+            return profiles.filter(function(p) {
+                return p && typeof p === "object" && !Array.isArray(p)
+                    && typeof p.name === "string" && p.name.trim().length > 0
+                    && !_isReserved(p.name)
+            })
+        } catch(e) { return [] }
     }
     function _saveProfiles(arr) { cfg_profiles = JSON.stringify(arr) }
     function _profileNames() { return _loadProfiles().map(function(p) { return p.name }) }
@@ -413,8 +422,8 @@ KCM.SimpleKCM {
             onValueModified: page.cfg_textScale = value
         }
         Hint {
-            text: page.tr2("Размер шрифта относительно системного.",
-                           "Font size relative to the system font.")
+            text: page.tr2("Размер текста относительно базовых размеров шрифта виджета.",
+                           "Text size relative to the widget's base font sizes.")
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Толщина полосы:", "Bar thickness:")
@@ -675,8 +684,8 @@ KCM.SimpleKCM {
             onValueModified: page.cfg_edgeCurve = value
         }
         Hint {
-            text: page.tr2("Форма перехода: 0 — ровный, значения выше и ниже нуля меняют его крутизну.",
-                           "Transition shape: 0 is even; positive and negative values change its steepness.")
+            text: page.tr2("Положительные значения сдвигают затухание ближе к краю, отрицательные — ближе к центру. 0 — базовая кривая, не линейная.",
+                           "Positive values shift fading toward the edge, negative values toward the center. 0 is the base curve, not a linear fade.")
         }
         QQC2.SpinBox {
             Kirigami.FormData.label: page.tr2("Отступ содержимого:", "Content padding:")

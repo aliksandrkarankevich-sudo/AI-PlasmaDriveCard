@@ -49,7 +49,7 @@ PlasmoidItem {
    property bool activityRunning: false
    property bool pendingRefresh:  false
    property var  previousIo:      ({})
-   property real _lastScanMs:     0
+   property string storageSnapshot: ""
    property var  overrides:       ({})
 
    function tr2(r, e) { return ru ? r : e }
@@ -344,7 +344,6 @@ PlasmoidItem {
        syncModel(items)
        rowCount   = rowsTotal
        groupCount = list.length
-       _lastScanMs = Date.now()
    }
    function refresh(delay) {
        if (delay > 0) { delayedRefresh.interval = delay; delayedRefresh.restart(); return }
@@ -371,8 +370,8 @@ PlasmoidItem {
            if (row.isHeader) continue
            var now    = current[row.kname]
            var before = previousIo[row.kname]
-           drives.setProperty(j, "active",
-               now !== undefined && before !== undefined && now !== before)
+           var active = now !== undefined && before !== undefined && now !== before
+           if (row.active !== active) drives.setProperty(j, "active", active)
        }
        previousIo = current
    }
@@ -386,6 +385,18 @@ PlasmoidItem {
    }
    function scheduleStorageRefresh() {
        refresh(400)
+   }
+   function updateStorageSnapshot(output) {
+       if (!output) return
+       if (storageSnapshot && output !== storageSnapshot)
+           scheduleStorageRefresh()
+       storageSnapshot = output
+   }
+   function resetActivity() {
+       previousIo = ({})
+       for (var i = 0; i < drives.count; ++i) {
+           if (drives.get(i).active) drives.setProperty(i, "active", false)
+       }
    }
 
    readonly property string scanCommand: "/bin/sh -c \"" + scanScript + "\""
@@ -421,7 +432,8 @@ PlasmoidItem {
            } else if (sourceName === root.activityCommand) {
                disconnectSource(sourceName)
                root.activityRunning = false
-               root.applyActivity(data["stdout"] || "")
+               if (Plasmoid.configuration.showActivity)
+                   root.applyActivity(data["stdout"] || "")
            }
        }
    }
@@ -464,7 +476,7 @@ PlasmoidItem {
        interval: 5000
        repeat:   true
        running:  true
-       property int _lastCount: -1
+       triggeredOnStart: true
        onTriggered: hotplugExec.connectSource("cat /proc/partitions /proc/self/mountinfo")
    }
    Plasma5Support.DataSource {
@@ -472,12 +484,8 @@ PlasmoidItem {
        engine: "executable"
        onNewData: function(sourceName, data) {
            disconnectSource(sourceName)
-           var lines = (data["stdout"] || "").split("\n").filter(function(l) {
-               return l.trim().length > 0
-           }).length
-           if (hotplugPoller._lastCount >= 0 && lines !== hotplugPoller._lastCount)
-               root.scheduleStorageRefresh()
-           hotplugPoller._lastCount = lines
+           if (data["exit code"] === 0)
+               root.updateStorageSnapshot(data["stdout"] || "")
        }
    }
 
@@ -489,12 +497,11 @@ PlasmoidItem {
        function onCustomIconPathChanged()  { root.refreshIcons() }
        function onVolumeOverridesChanged() { root.loadOverrides(); root.refreshIcons() }
        function onLanguageChanged()        { root.scheduleStorageRefresh() }
-       function onTextScaleChanged()       { root.scheduleStorageRefresh() }
-       function onRowPaddingVChanged()     { root.scheduleStorageRefresh() }
-       function onSeparatorHeightChanged() { root.scheduleStorageRefresh() }
-       function onProgressHeightChanged()  { root.scheduleStorageRefresh() }
-       function onMaxHeightChanged()       { root.scheduleStorageRefresh() }
-       function onAutoFitChanged()         { root.scheduleStorageRefresh() }
+       function onShowActivityChanged()    { root.resetActivity() }
+       // Geometry is updated by QML bindings, without rescanning storage.
+       function onAutoFitChanged() {
+           if (Plasmoid.configuration.autoFit) root.height = root.wantedHeight
+       }
    }
 
    Component.onCompleted: {
@@ -568,13 +575,10 @@ PlasmoidItem {
                    required property double available
                    required property int    used
                    required property string driveIcon
-                   required property string kname
                    required property bool   active
                    required property bool   isHeader
                    required property string groupSub
-                   required property string kind
                    required property int    iconScale
-                   required property int    index
 
                    function measureRow() {
                        if (!isHeader && row.implicitHeight > 0)

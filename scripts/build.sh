@@ -1,8 +1,14 @@
 #!/usr/bin/env bash
 # Build the .plasmoid archive, generate SHA256SUMS, then install or upgrade
 # (install step is skipped when kpackagetool6 is not available, e.g. in CI).
-# Usage: bash scripts/build.sh
+# Usage: bash scripts/build.sh [--no-install]
 set -euo pipefail
+if [[ $# -gt 1 || ( $# -eq 1 && "$1" != "--no-install" ) ]]; then
+    echo "Usage: bash scripts/build.sh [--no-install]" >&2
+    exit 2
+fi
+INSTALL=true
+if [[ "${1:-}" == "--no-install" ]]; then INSTALL=false; fi
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
@@ -19,7 +25,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 import sys
 
 root = Path('package')
-exclude = ('.backup', '.backup-before-fix', '~', '.swp', '.swo', '.DS_Store')
+exclude = ('.backup', '.bak', '~', '.swp', '.swo', '.DS_Store')
 
 with ZipFile(sys.argv[1], 'w', ZIP_DEFLATED) as z:
     for p in sorted(root.rglob('*')):
@@ -33,6 +39,11 @@ PY
 ( cd dist && sha256sum "$(basename "${out}")" > SHA256SUMS )
 
 echo "Built: ${out}"
+
+if [[ "${INSTALL}" == false ]]; then
+    echo "Build only: skipping install step"
+    exit 0
+fi
 
 # Install or upgrade (only where kpackagetool6 exists)
 if ! command -v kpackagetool6 >/dev/null 2>&1; then

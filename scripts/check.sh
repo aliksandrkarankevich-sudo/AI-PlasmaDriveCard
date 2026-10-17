@@ -81,7 +81,7 @@ fi
 # 8. Build
 echo ""
 echo "--- Running build ---"
-bash "${SCRIPT_DIR}/build.sh"
+bash "${SCRIPT_DIR}/build.sh" --no-install
 
 # 9. Verify .plasmoid artefact exists
 VERSION="$(python3 -c "import json,sys; print(json.load(open('${META}'))['KPlugin']['Version'])")"
@@ -92,14 +92,36 @@ else
     fail "${PLASMOID##*/} not found"
 fi
 
-# 10. No backup files inside the .plasmoid archive
+# 10. Read and validate the archive using the existing Python dependency.
+# Do not turn a missing/broken archive reader into a successful check.
 if [[ -f "${PLASMOID}" ]]; then
-    BAD="$(unzip -l "${PLASMOID}" | grep -E '\.backup|\.bak' || true)"
-    if [[ -z "${BAD}" ]]; then
-        ok "No backup files inside .plasmoid"
+    if python3 - "${PLASMOID}" <<'PY'
+import sys
+from zipfile import ZipFile
+
+with ZipFile(sys.argv[1]) as archive:
+    bad_crc = archive.testzip()
+    backups = [name for name in archive.namelist()
+               if ".backup" in name or ".bak" in name]
+    if bad_crc or backups:
+        print("Invalid archive:", bad_crc, backups, file=sys.stderr)
+        sys.exit(1)
+PY
+    then
+        ok "Archive integrity and absence of backup files"
     else
-        fail "Backup files inside .plasmoid: ${BAD}"
+        fail "Unreadable/corrupt archive or backup files inside .plasmoid"
     fi
+fi
+
+if command -v node >/dev/null 2>&1; then
+    if node --test "${SCRIPT_DIR}/test-logic.cjs"; then
+        ok "JavaScript logic regression tests"
+    else
+        fail "JavaScript logic regression tests"
+    fi
+else
+    echo "  [SKIP] JavaScript logic tests require Node.js 18+ (not needed by the widget)"
 fi
 
 echo ""

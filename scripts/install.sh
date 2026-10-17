@@ -21,4 +21,4 @@ fi
 
 echo ""
 echo "Done. Restart Plasma or log out/in to use the widget."
-echo "  plasmashell --replace &"
+echo "  systemctl --user restart plasma-plasmashell.service"

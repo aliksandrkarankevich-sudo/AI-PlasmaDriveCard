@@ -29,7 +29,9 @@ cd AI-PlasmaDriveCard
 ./scripts/install.sh
 ```
 
-Только сборка пакета: `./scripts/build.sh` (результат в `dist/`).
+Только сборка пакета: `bash scripts/build.sh --no-install` (результат в `dist/`).
+`bash scripts/check.sh` проверяет и собирает пакет без установки.
+`bash scripts/build.sh` без флага сохраняет прежнее поведение: собирает и устанавливает пакет, если доступен `kpackagetool6`.
 
 ## Перезапуск Plasma
 
