@@ -78,8 +78,11 @@ KCM.SimpleKCM {
     readonly property bool ru: cfg_language !== "en"
     function tr2(r, e) { return ru ? r : e }
 
+    // Wrapped labels report the width of their whole unwrapped text as implicitWidth,
+    // which inflates Kirigami.FormLayout's own width. A modest preferredWidth keeps it compact.
     component Hint: QQC2.Label {
         Layout.fillWidth: true
+        Layout.preferredWidth: Kirigami.Units.gridUnit * 20
         wrapMode: Text.Wrap
         opacity: 0.7
         font: Kirigami.Theme.smallFont
@@ -311,9 +314,6 @@ KCM.SimpleKCM {
     }
 
     Kirigami.FormLayout {
-        anchors.left: parent.left
-        anchors.right: parent.right
-
         // ---- Profiles ----
         Kirigami.Heading {
             Kirigami.FormData.isSection: true; level: 3
@@ -485,11 +485,7 @@ KCM.SimpleKCM {
                 if (id === "custom" && !page.cfg_customIconPath) iconDialog.open()
             }
         }
-        QQC2.Label {
-            Layout.fillWidth: true
-            wrapMode: Text.Wrap
-            opacity: 0.7
-            font: Kirigami.Theme.smallFont
+        Hint {
             text: page.tr2("Общий значок для всех дисков. Для отдельных томов его можно переопределить ниже.",
                            "One icon for all drives. You can override it for individual volumes below.")
         }
@@ -509,12 +505,8 @@ KCM.SimpleKCM {
                 onClicked: iconDialog.open()
             }
         }
-        QQC2.Label {
-            Layout.fillWidth: true
+        Hint {
             visible: page.cfg_iconStyle === "custom"
-            wrapMode: Text.Wrap
-            opacity: 0.7
-            font: Kirigami.Theme.smallFont
             text: page.tr2("Файл SVG, SVGZ или PNG, который будет показан у всех дисков.",
                            "An SVG, SVGZ or PNG file shown next to all drives.")
         }
@@ -592,6 +584,7 @@ KCM.SimpleKCM {
         QQC2.Label {
             Kirigami.FormData.label: page.tr2("Задано:", "Configured:")
             Layout.fillWidth: true
+            Layout.preferredWidth: Kirigami.Units.gridUnit * 20
             text: page._ovSummary()
             wrapMode: Text.Wrap
             opacity: 0.8
