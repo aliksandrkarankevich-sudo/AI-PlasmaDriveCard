@@ -311,6 +311,9 @@ KCM.SimpleKCM {
     }
 
     Kirigami.FormLayout {
+        anchors.left: parent.left
+        anchors.right: parent.right
+
         // ---- Profiles ----
         Kirigami.Heading {
             Kirigami.FormData.isSection: true; level: 3
