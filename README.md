@@ -1,7 +1,7 @@
 # Drive Cards
 
 ![Plasma 6](https://img.shields.io/badge/KDE%20Plasma-6-blue)
-![Version](https://img.shields.io/badge/version-0.96.0--beta3-orange)
+![Version](https://img.shields.io/badge/version-0.97.0--beta1-orange)
 ![License](https://img.shields.io/badge/license-GPL--3.0--or--later-green)
 
 Небольшой полупрозрачный виджет дисков для KDE Plasma 6 и CachyOS. Показывает смонтированные локальные разделы, свободное место, файловую систему и краткое имя физического накопителя.
@@ -59,8 +59,10 @@ kpackagetool6 --type Plasma/Applet --install cachyos-drive-card-*.plasmoid
 
 ### Способ 3 — Из исходников (для разработки и тестирования)
 
+Для этой рабочей версии явно выберите ветку разработки. Установка из Releases выше не устанавливает неопубликованную 0.97-beta1.
+
 ```bash
-git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
+git clone --branch dev/v0.97-beta1 https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
 bash scripts/install.sh
 ```
@@ -110,7 +112,13 @@ journalctl --user -b | grep -Ei "drivecard|qml"
 
 ## Статус
 
-0.96.0-beta3 — тестовая версия (pre-release). Стабильных выпусков пока нет. Перед обновлением сохраните настройки установленной версии.
+`dev/v0.97-beta1` — текущая ветка разработки; версия пакета `0.97.0-beta1`. Тег и GitHub Release для неё не создаются этим переходом.
+
+Стабильная линия `0.96.0` подготавливается отдельно из неизменённой `dev/v0.96-beta5` в PR #13. До завершения публикации это кандидат, а не уже опубликованный стабильный выпуск. Более ранние версии считаются историческими, старые ветки и файлы Release сохраняются. Защита `main` не включается.
+
+Незавершённые пункты в ROADMAP, аудите и документах beta4 остаются задачами разработки; старые названия в этих документах отражают историю. Номер 0.97-beta1 не означает, что эти проверки пройдены. Не выполнять слепое merge релизной metadata из main: в этой ветке сохранять `0.97.0-beta1`.
+
+Перед обновлением сохраните настройки установленной версии.
 
 ## Авторы
 
