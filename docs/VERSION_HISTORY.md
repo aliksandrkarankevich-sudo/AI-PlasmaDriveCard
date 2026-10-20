@@ -2,6 +2,19 @@
 
 Format: newest first. Details are reconstructed from the commit history of each branch.
 
+## Текущие линии после перехода
+
+- Стабильная линия: `0.96.0`, подготовлена из `dev/v0.96-beta5` (`a952715acf5f3dd78c519ddcd136c486d6ba542d`). До публикации Release — только подготовленный кандидат.
+- Разработка: `dev/v0.97-beta1`, номер пакета `0.97.0-beta1`, без тега и публичного pre-release.
+- Beta5 сохраняется под прежним именем ветки как точный источник стабильной линии; остальные старые версии — исторические, без удаления веток и старых Release assets.
+- План снимков `archive/...`, проверок и публикации: [RELEASE_TRANSITION.md](RELEASE_TRANSITION.md).
+
+## v0.96.0-beta4 (историческая разработка)
+
+- Ветка: `dev/v0.96-beta4`, состояние перед переходом `56f0d7189edcae71cc110c0a8bc306c7b9d5dba1`.
+- Отдельного GitHub Release до перехода нет; изменения включены в beta5 и подготовку `0.96.0`.
+- Исторические подробности: [аудит](AUDIT_BETA4.md), [подготовка](BETA4_PREPARATION.md).
+
 ## v0.96.0-beta3 (release tag `v0.96.0-beta3`, pre-release; development branch `dev/v0.96-beta3`)
 
 UI and settings
