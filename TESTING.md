@@ -19,7 +19,7 @@ bash install-from-github.sh
 ```bash
 git clone https://github.com/aliksandrkarankevich-sudo/AI-PlasmaDriveCard.git
 cd AI-PlasmaDriveCard
-bash scripts/build.sh
+bash scripts/build.sh --no-install
 kpackagetool6 --type Plasma/Applet --install dist/cachyos-drive-card-0.96.0-beta3.plasmoid
 ```
 
